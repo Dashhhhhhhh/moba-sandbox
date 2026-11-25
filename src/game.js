@@ -50,6 +50,11 @@
     { id: "red-thorn", name: "Thornbacks", x: 800, y: 550, stats: Sim.CAMP_STATS.thornbacks },
   ];
 
+  const EPIC_OBJECTIVE_DEFS = [
+    { id: "north-pit", bossKey: "gorehorn", x: 500, y: 500 },
+    { id: "south-pit", bossKey: "vessikar", x: 1000, y: 1000 },
+  ];
+
   // ------------------------------------------------------------ state
 
   const state = {
@@ -62,6 +67,8 @@
     towers: [],
     tracers: [],
     camps: [],
+    epicObjectives: [],
+    teamBuffs: { blue: null, red: null },
     keys: {},
     mouse: { x: 750, y: 750 },
     moveTarget: null,
@@ -116,8 +123,14 @@
     lastBounceAt: -10,
   };
 
+  function activeTeamBuff(team) {
+    const buff = state.teamBuffs[team];
+    return buff && state.time < buff.expiresAt ? buff : null;
+  }
+
   function heroAttackDamage() {
-    return hero.baseAd + hero.bonusAd + (hero.level - 1) * 4;
+    const buff = activeTeamBuff(hero.team);
+    return hero.baseAd + hero.bonusAd + (hero.level - 1) * 4 + (buff ? buff.attackDamageBonus : 0);
   }
 
   // Camps pair Sim camp state with live monster units.
@@ -153,6 +166,41 @@
     }
   }
   state.camps.forEach(spawnCampMonsters);
+
+  function spawnEpicBoss(objective) {
+    const stats = objective.def.stats;
+    objective.monster = {
+      x: objective.def.x,
+      y: objective.def.y,
+      homeX: objective.def.x,
+      homeY: objective.def.y,
+      radius: stats.radius,
+      maxHp: stats.maxHp,
+      hp: stats.maxHp,
+      damage: stats.damage,
+      damageType: stats.damageType,
+      range: stats.range,
+      speed: stats.speed,
+      attackPeriod: stats.attackPeriod,
+      leashRange: stats.leashRange,
+      armor: stats.armor,
+      magicResist: stats.magicResist,
+      attackCooldown: stats.attackPeriod,
+      rootUntil: 0,
+      alive: true,
+      lastAttacker: null,
+    };
+  }
+
+  state.epicObjectives = EPIC_OBJECTIVE_DEFS.map(function (def) {
+    const objective = {
+      def: Object.assign({}, def, { stats: Sim.EPIC_BOSS_STATS[def.bossKey] }),
+      sim: Sim.createCamp("epic"),
+      monster: null,
+    };
+    spawnEpicBoss(objective);
+    return objective;
+  });
 
   // One tower per lane per side, placed 35 percent of the lane's length
   // from its own base. Stats live in Sim.TOWER.
@@ -442,6 +490,47 @@
     });
   }
 
+  function updateEpicObjectives(dt) {
+    state.epicObjectives.forEach(function (objective) {
+      if (!objective.sim.alive) {
+        if (Sim.updateCamp(objective.sim, state.time)) spawnEpicBoss(objective);
+        else return;
+      }
+
+      const boss = objective.monster;
+      if (boss.hp <= 0) {
+        Sim.clearCamp(objective.sim, state.time);
+        const reward = Sim.epicBossReward(objective.def.bossKey, hero.team, state.time);
+        state.teamBuffs[reward.team] = reward.buff;
+        hero.gold += reward.goldPerChampion;
+        gainXp(reward.xpPerChampion);
+        return;
+      }
+
+      if (isGrabbed(boss) || isRooted(boss)) return;
+      boss.attackCooldown -= dt;
+      const distanceToHero = hero.dead || hero.split ? Infinity : dist(boss, hero);
+      if (distanceToHero <= boss.leashRange) {
+        if (distanceToHero <= boss.range + boss.radius + hero.radius) {
+          if (boss.attackCooldown <= 0) {
+            boss.attackCooldown = boss.attackPeriod;
+            const damage = boss.damageType === "magic"
+              ? Sim.mitigateMagic(boss.damage, hero.magicResist)
+              : Sim.mitigatePhysical(boss.damage, hero.armor);
+            damageUnit(hero, damage, boss);
+          }
+        } else if (boss.speed > 0 && !isRooted(boss)) {
+          moveToward(boss, hero, boss.speed, dt);
+        }
+      } else {
+        if (dist(boss, { x: boss.homeX, y: boss.homeY }) > 4 && !isRooted(boss)) {
+          moveToward(boss, { x: boss.homeX, y: boss.homeY }, 120, dt);
+        }
+        boss.hp = Math.min(boss.maxHp, boss.hp + boss.maxHp * 0.08 * dt);
+      }
+    });
+  }
+
   // ------------------------------------------------------------ towers
 
   function updateTowers(dt) {
@@ -694,6 +783,12 @@
         }
       });
     });
+    state.epicObjectives.forEach(function (objective) {
+      const boss = objective.monster;
+      if (objective.sim.alive && boss.hp > 0 && dist(point, boss) <= radius + boss.radius) {
+        out.push(boss);
+      }
+    });
     return out;
   }
 
@@ -780,7 +875,8 @@
 
     // Regeneration and fountain.
     hero.mana = Math.min(hero.maxMana, hero.mana + 9 * dt);
-    hero.hp = Math.min(hero.maxHp, hero.hp + 3.5 * dt);
+    const teamBuff = activeTeamBuff(hero.team);
+    hero.hp = Math.min(hero.maxHp, hero.hp + (3.5 + (teamBuff ? teamBuff.healthRegenPerSecond : 0)) * dt);
     if (dist(hero, BLUE_BASE) < 170) {
       hero.hp = Math.min(hero.maxHp, hero.hp + hero.maxHp * 0.12 * dt);
       hero.mana = Math.min(hero.maxMana, hero.mana + hero.maxMana * 0.12 * dt);
@@ -842,6 +938,15 @@
           target = mon;
         }
       });
+    });
+    state.epicObjectives.forEach(function (objective) {
+      const boss = objective.monster;
+      if (!objective.sim.alive || boss.hp <= 0) return;
+      const d = dist(hero, boss);
+      if (d < targetD) {
+        targetD = d;
+        target = boss;
+      }
     });
     state.towers.forEach(function (t) {
       if (t.team === hero.team || t.hp <= 0) return;
@@ -951,11 +1056,10 @@
     ctx.lineTo(WORLD - 40, WORLD - 40);
     ctx.stroke();
 
-    // Epic pits (bosses arrive with GAME-006).
-    [
-      { x: 500, y: 500 },
-      { x: 1000, y: 1000 },
-    ].forEach(function (pit) {
+    // Epic objective pits and bosses.
+    state.epicObjectives.forEach(function (objective) {
+      const pit = objective.def;
+      const boss = objective.monster;
       ctx.fillStyle = "#59396e";
       ctx.beginPath();
       ctx.arc(pit.x, pit.y, 58, 0, Math.PI * 2);
@@ -963,6 +1067,35 @@
       ctx.strokeStyle = "#c9a227";
       ctx.lineWidth = 4;
       ctx.stroke();
+      ctx.textAlign = "center";
+      if (!objective.sim.alive) {
+        const remaining = Math.ceil(Sim.campRespawnRemaining(objective.sim, state.time));
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 18px sans-serif";
+        ctx.fillText(pit.stats.displayName, pit.x, pit.y - 12);
+        ctx.font = "bold 22px sans-serif";
+        ctx.fillText(remaining + "s", pit.x, pit.y + 16);
+        return;
+      }
+
+      ctx.fillStyle = pit.bossKey === "gorehorn" ? "#a84935" : "#38a9bb";
+      ctx.beginPath();
+      ctx.arc(boss.x, boss.y, boss.radius, 0, Math.PI * 2);
+      ctx.fill();
+      if (pit.bossKey === "gorehorn") {
+        ctx.strokeStyle = "#e7c18b";
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(boss.x - 24, boss.y - 22);
+        ctx.lineTo(boss.x - 38, boss.y - 38);
+        ctx.moveTo(boss.x + 24, boss.y - 22);
+        ctx.lineTo(boss.x + 38, boss.y - 38);
+        ctx.stroke();
+      }
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 13px sans-serif";
+      ctx.fillText(pit.stats.displayName, boss.x, boss.y - 48);
+      drawBar(boss.x, boss.y - 40, 84, boss.hp / boss.maxHp, "#c0392b");
     });
 
     // Lanes.
@@ -1226,6 +1359,7 @@
     mana: document.getElementById("hud-mana"),
     xp: document.getElementById("hud-xp"),
     abilities: document.getElementById("hud-abilities"),
+    objectives: document.getElementById("hud-objectives"),
   };
 
   function fmtTime(t) {
@@ -1249,6 +1383,10 @@
     const into = hero.xp - Sim.cumulativeXpForLevel(hero.level);
     const needed = Sim.xpToNextLevel(hero.level);
     hud.xp.style.width = (100 * into) / needed + "%";
+    const teamBuff = activeTeamBuff(hero.team);
+    hud.objectives.textContent = teamBuff
+      ? "Team buff: " + teamBuff.name + " (" + Math.ceil(teamBuff.expiresAt - state.time) + "s)"
+      : "Epic objectives: Gorehorn and Vessikar";
     const qLabel = hero.grab
       ? "Q SLAM!"
       : hero.cooldowns.stretchGrab > 0
@@ -1315,6 +1453,7 @@
     updateHero(dt);
     updateMinions(dt);
     updateCamps(dt);
+    updateEpicObjectives(dt);
     updateTowers(dt);
     updateProjectiles(dt);
     draw();

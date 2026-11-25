@@ -16,6 +16,7 @@
   #hud-xp { background: #9b59b6; height: 6px; }
   #hud-top { display: flex; gap: 18px; font-weight: bold; margin: 6px 0; }
   #hud-abilities { font-size: 13px; margin-top: 6px; }
+  #hud-objectives { font-size: 13px; margin-top: 4px; color: #e8cf85; }
   p.help { font-size: 13px; color: #b9bfae; }
 </style>
 </head>
@@ -32,6 +33,7 @@
   <div class="bar"><div id="hud-mana" style="width:100%"></div></div>
   <div class="bar" id="hud-xpbar"><div id="hud-xp" style="width:0%"></div></div>
   <div id="hud-abilities"></div>
+  <div id="hud-objectives"></div>
   <p class="help">
     Move: arrow keys or right-click. Aim with the mouse. Abilities: Q Stretch
     Grab (cast to grab an enemy, cast again to slam it), W Ooze Burst,
@@ -40,8 +42,9 @@
     chunks when you take damage, and on lethal damage you split into
     bloblets: keep at least one alive for 6 seconds to revive. Your champion
     auto-attacks the nearest enemy in range. Clear jungle camps, last-hit
-    red minions, and level up. Push with your wave to take down the red
-    towers; enemy champions and epic bosses are on the work board.
+    red minions, and level up. Defeat Gorehorn or Vessikar in the river pits
+    for a team-wide reward, then push with your wave to take down the red
+    towers; enemy champions remain on the work board.
   </p>
 </div>
 <script src="src/sim.js"></script>

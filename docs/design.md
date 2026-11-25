@@ -23,8 +23,8 @@ is original to this project.
 - The jungle is everything between the lanes, split into four quadrants by
   the lanes and the river.
 - Two epic pits sit on the river at (500, 500) and (1000, 1000):
-  - North pit: Gorehorn, the Hollow Elder (boss encounter is GAME-006).
-  - South pit: Vessikar, the Tidewyrm (boss encounter is GAME-006).
+  - North pit: Gorehorn, the Hollow Elder, a close-range physical boss.
+  - South pit: Vessikar, the Tidewyrm, a stationary ranged magic boss.
 - Each side of the jungle holds four camps, mirrored through the centre:
   - Crimson Brute (buff camp, 1 monster): will grant the Ember Sigil buff
     when slain (buff effect is future work; the camp ships in the
@@ -41,8 +41,8 @@ is original to this project.
    respawn on fixed timers, so efficient players plan routes around them.
 3. Gold buys items (item system is future work), XP levels the champion up
    and strengthens abilities.
-4. Teams take epic objectives on the river for team-wide power, push lanes,
-   destroy the enemy Heartspire, and win.
+4. Teams take epic objectives on the river for team-wide gold, XP, and a
+   timed buff, push lanes, destroy the enemy Heartspire, and win.
 
 ## Numbers (implemented in src/sim.js)
 
@@ -62,6 +62,7 @@ is original to this project.
   objectives 360 s. The timer starts when the last monster of the camp dies.
 - Camp combat and reward values live in `Sim.CAMP_STATS`; map positions
   remain in `src/game.js`.
+- Epic boss combat and reward values live in `Sim.EPIC_BOSS_STATS`.
 
 | Camp | Monsters | HP each | Damage | Radius | Gold | XP |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -69,6 +70,25 @@ is original to this project.
 | Ember Wolves | 2 | 520 | 11 | 17 | 70 | 95 |
 | Stone Golems | 2 | 640 | 13 | 17 | 75 | 100 |
 | Thornbacks | 2 | 480 | 12 | 17 | 65 | 90 |
+
+### Epic objectives
+
+- Both bosses have a 520-unit leash. Outside it they return to their pit and
+  recover 8% of maximum HP per second.
+- Gorehorn has 4000 HP, 30 armor, and 20 magic resist. He closes to 100 range,
+  moves at 85 units per second, and deals 52 physical damage every 1.6 s.
+- Vessikar has 3400 HP, 20 armor, and 35 magic resist. She holds her pit and
+  deals 44 magic damage every 1.8 s at up to 300 range.
+- Defeating either grants every champion on the team 150 gold and 240 XP,
+  plus a 90 s team buff:
+
+| Boss | Team buff |
+| --- | --- |
+| Gorehorn | Hollow Might: +12 attack damage |
+| Vessikar | Tide's Renewal: +6 health regeneration per second |
+
+- In the current single-champion prototype, the controlled champion receives
+  the team's gold, XP, and buff. The active buff is stored by team.
 
 ### Combat
 
