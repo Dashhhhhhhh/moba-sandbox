@@ -99,6 +99,22 @@ The rules engine is tested headlessly with the built-in Node test runner
 node --test "tests/*.test.js"
 ```
 
+## Run the balance harness
+
+Run deterministic lane and camp simulations and print their results as JSON:
+
+```sh
+node tools/balance-harness.js --scenario all --max-seconds 180
+```
+
+`--scenario` accepts `lane`, `camp`, or `all` (the default). The optional
+`--max-seconds` limit is an integer from 1 to 1800; simulations use a fixed
+0.1-second step and no randomness. The lane run models one stationary minion
+wave and one Bloop bot per team; camp runs pit one level-1 Bloop bot against
+each original camp profile. This is a repeatable balance probe, not a full
+replay of browser movement, targeting, or passive behavior. Its champion,
+minion, and camp stats come from `src/sim.js`.
+
 ## How development works
 
 This repository is designed so that an AI agent (or a human) can arrive
@@ -136,6 +152,7 @@ an open item, and claim it.
 | `src/sim.js` | Rules and balance numbers as pure functions (tested) |
 | `src/game.js` | Rendering, input, and the game loop |
 | `tests/` | Headless tests for the rules engine |
+| `tools/balance-harness.js` | Deterministic headless lane and camp balance runs |
 | `docs/design.md` | The design contract |
 | `AGENTS.md` | Rules and workflow for coding agents |
 | `CONTRIBUTING.md` | The claim protocol for all contributors |
