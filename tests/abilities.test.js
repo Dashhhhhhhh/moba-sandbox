@@ -86,6 +86,21 @@ test("revive health scales with surviving bloblets", function () {
   assert.equal(Sim.blobletReviveHp(1000, 0), 0);
 });
 
+test("invalid ability ranks throw instead of returning NaN", function () {
+  const target = { armor: 0, magicResist: 0, maxHp: 1000 };
+  [0, -1, NaN].forEach(function (rank) {
+    assert.throws(function () {
+      Sim.abilityRawDamage("oozeBurst", rank, 0, 0);
+    }, /invalid ability rank/);
+    assert.throws(function () {
+      Sim.abilityMaxHpDamage("oozeBurst", rank, 1000);
+    }, /invalid ability rank/);
+    assert.throws(function () {
+      Sim.abilityDamage("oozeBurst", rank, 0, 0, target);
+    }, /invalid ability rank/);
+  });
+});
+
 test("unknown ability throws", function () {
   assert.throws(function () {
     Sim.abilityRawDamage("notAnAbility", 1, 0, 0);

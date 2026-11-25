@@ -285,13 +285,24 @@ const ABILITIES = {
   },
 };
 
+// Index into a per-rank values array. Ranks are 1-based; a rank above
+// the defined values clamps to the last one. An invalid rank (below 1,
+// or not a finite number) throws, like an unknown ability key does,
+// instead of silently producing NaN damage.
+function abilityRankIndex(values, rank) {
+  if (typeof rank !== "number" || !Number.isFinite(rank) || rank < 1) {
+    throw new Error("invalid ability rank: " + rank);
+  }
+  return Math.min(Math.floor(rank), values.length) - 1;
+}
+
 // Raw (pre-mitigation) flat damage of an ability at a 1-based rank, given
 // the caster's bonus attack damage and ability power. Does not include
 // any max-health component; see abilityMaxHpDamage.
 function abilityRawDamage(abilityKey, rank, bonusAd, ap) {
   const def = ABILITIES[abilityKey];
   if (!def) throw new Error("unknown ability: " + abilityKey);
-  const idx = Math.min(rank, def.baseDamage.length) - 1;
+  const idx = abilityRankIndex(def.baseDamage, rank);
   return def.baseDamage[idx] + def.adRatio * bonusAd + def.apRatio * ap;
 }
 
@@ -301,7 +312,7 @@ function abilityMaxHpDamage(abilityKey, rank, targetMaxHp) {
   const def = ABILITIES[abilityKey];
   if (!def) throw new Error("unknown ability: " + abilityKey);
   if (!def.maxHpRatio) return 0;
-  const idx = Math.min(rank, def.maxHpRatio.length) - 1;
+  const idx = abilityRankIndex(def.maxHpRatio, rank);
   return def.maxHpRatio[idx] * targetMaxHp;
 }
 
