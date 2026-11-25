@@ -198,6 +198,26 @@ test("elastic launch still fires when the mana is there", function () {
   assert.equal(T.hero.mana, T.hero.maxMana - Sim.ABILITIES.elasticLaunch.manaCost);
 });
 
+test("lethal damage during elastic launch flight kills before landing", function () {
+  const T = loadGame();
+  parkHero(T, 750, 750);
+  T.hero.passiveReadyAt = Infinity; // passive spent: death is real
+  const bystander = meleeMinion(T, 1050, 750);
+  bystander.rootUntil = Infinity; // rooted: stays at the landing point
+  T.state.minions.push(bystander);
+  T.state.mouse.x = 1050;
+  T.state.mouse.y = 750;
+  T.startCharge();
+  T.releaseLaunch();
+  assert.notEqual(T.hero.flight, null);
+  T.hero.hp = -10; // lethal damage taken mid-flight
+  step(T, 0.05);
+  assert.equal(T.hero.dead, true);
+  assert.equal(T.hero.flight, null);
+  step(T, 1);
+  assert.equal(bystander.hp, bystander.maxHp); // no landing damage, no auto-attack
+});
+
 test("boing barrage casts normally at level 6", function () {
   const T = loadGame();
   parkHero(T, 750, 750);

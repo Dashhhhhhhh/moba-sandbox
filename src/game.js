@@ -663,6 +663,16 @@
     hero.respawnAt = state.time + Sim.respawnTime(hero.level);
   }
 
+  // Death resolution, shared by the grounded and flight paths: Loose
+  // Gel gets one say before death does.
+  function resolveDeath() {
+    if (state.time >= hero.passiveReadyAt) {
+      enterSplit();
+    } else {
+      killHero();
+    }
+  }
+
   function castReap() {
     if (hero.dead || hero.split || hero.flight || hero.cooldowns.reap > 0) return;
     let best = null;
@@ -775,6 +785,13 @@
 
     // Elastic Launch flight.
     if (hero.flight) {
+      // Lethal damage taken mid-flight ends the flight here: no
+      // landing damage, no knockup, no auto-attack from a dead blob.
+      if (hero.hp <= 0) {
+        hero.flight = null;
+        resolveDeath();
+        return;
+      }
       const f = hero.flight;
       const t = Math.min(1, (state.time - f.start) / f.duration);
       hero.x = f.fromX + (f.toX - f.fromX) * t;
@@ -862,14 +879,7 @@
       damageUnit(target, Sim.mitigatePhysical(heroAttackDamage(), armor), hero);
     }
 
-    if (hero.hp <= 0) {
-      // Loose Gel gets one say before death does.
-      if (state.time >= hero.passiveReadyAt) {
-        enterSplit();
-      } else {
-        killHero();
-      }
-    }
+    if (hero.hp <= 0) resolveDeath();
   }
 
   function updateProjectiles(dt) {
