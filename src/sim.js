@@ -271,6 +271,7 @@ const ABILITIES = {
     name: "Boing Barrage",
     cooldown: 100,
     manaCost: 100,
+    unlockLevel: 6,
     damageType: "magic",
     // Damage is per bounce.
     baseDamage: [120, 170, 220],

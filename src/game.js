@@ -490,6 +490,7 @@
       return;
     }
     const def = Sim.ABILITIES[key];
+    if (def.unlockLevel && hero.level < def.unlockLevel) return;
     if (hero.cooldowns[key] > 0 || hero.mana < def.manaCost) return;
     hero.mana -= def.manaCost;
     hero.cooldowns[key] = def.cooldown;

@@ -151,7 +151,7 @@ slingshotting himself into fights. Base stats in the prototype: 680 HP,
   landing deals magic damage 120 to 220 by rank plus 0.4 ability power
   to enemies within 240 units and slows them by 30% for 1.0 s. The
   first bounce that hits a given enemy also knocks it back 120 units.
-  Cooldown 100 s, mana 100.
+  Cooldown 100 s, mana 100. Unlocks at level 6.
 
 ## Win condition
 

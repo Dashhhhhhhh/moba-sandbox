@@ -50,6 +50,10 @@ test("elastic launch range grows with charge time and clamps", function () {
   assert.equal(Sim.launchRange(99), def.maxRange);
 });
 
+test("boing barrage unlocks at level 6", function () {
+  assert.equal(Sim.ABILITIES.boingBarrage.unlockLevel, 6);
+});
+
 test("boing barrage bounces exactly four times", function () {
   assert.equal(Sim.ABILITIES.boingBarrage.bounces, 4);
   // Per-bounce rank 1 damage vs 0 resist is the 120 base; four bounces
