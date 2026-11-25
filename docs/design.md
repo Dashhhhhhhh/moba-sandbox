@@ -55,6 +55,9 @@ is original to this project.
 - Minion XP: melee 60, caster 30, siege 90, split evenly (floor) among
   nearby allies.
 - XP to level: going from level L to L+1 costs 180 + (L - 1) * 90 XP.
+- Level growth: +95 max HP, +35 max mana, and +4 attack damage per
+  level; leveling up restores 120 HP and refills mana.
+- Respawn after death: 5 s plus 0.5 s per level.
 
 ### Camps
 

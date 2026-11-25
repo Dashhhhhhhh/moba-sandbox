@@ -43,6 +43,19 @@ test("minion combat stats are available from the simulation catalog", function (
   assert.equal(Object.isFrozen(Sim.MINION_STATS.melee), true);
 });
 
+test("progression and Reap tuning live in the simulation catalog", function () {
+  assert.equal(Sim.STARTING_GOLD, 475);
+  assert.deepEqual(Sim.LEVEL_GROWTH, {
+    attackDamage: 4,
+    maxHp: 95,
+    maxMana: 35,
+    levelUpHeal: 120,
+  });
+  assert.equal(Sim.respawnTime(1), 5.5);
+  assert.equal(Sim.respawnTime(10), 10);
+  assert.deepEqual(Sim.REAP, { cooldown: 15, range: 320 });
+});
+
 test("camp balance stats distinguish original camp profiles", function () {
   assert.deepEqual(Sim.CAMP_STATS.buff, {
     kind: "buff",

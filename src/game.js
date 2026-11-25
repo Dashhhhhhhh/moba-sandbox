@@ -94,7 +94,7 @@
     attackPeriod: heroStats.attackPeriod,
     xp: 0,
     level: 1,
-    gold: 475,
+    gold: Sim.STARTING_GOLD,
     kills: 0,
     deaths: 0,
     dead: false,
@@ -117,7 +117,7 @@
   };
 
   function heroAttackDamage() {
-    return hero.baseAd + hero.bonusAd + (hero.level - 1) * 4;
+    return hero.baseAd + hero.bonusAd + (hero.level - 1) * Sim.LEVEL_GROWTH.attackDamage;
   }
 
   // Camps pair Sim camp state with live monster units.
@@ -257,9 +257,9 @@
     hero.xp += amount;
     hero.level = Sim.levelFromXp(hero.xp);
     if (hero.level > before) {
-      hero.maxHp += 95 * (hero.level - before);
-      hero.maxMana += 35 * (hero.level - before);
-      hero.hp = Math.min(hero.maxHp, hero.hp + 120);
+      hero.maxHp += Sim.LEVEL_GROWTH.maxHp * (hero.level - before);
+      hero.maxMana += Sim.LEVEL_GROWTH.maxMana * (hero.level - before);
+      hero.hp = Math.min(hero.maxHp, hero.hp + Sim.LEVEL_GROWTH.levelUpHeal);
       hero.mana = hero.maxMana;
     }
   }
@@ -653,7 +653,7 @@
     hero.chargeStart = null;
     hero.bounce = null;
     hero.flight = null;
-    hero.respawnAt = state.time + 5 + hero.level * 0.5;
+    hero.respawnAt = state.time + Sim.respawnTime(hero.level);
   }
 
   function castReap() {
@@ -670,8 +670,8 @@
         }
       });
     });
-    if (!best || bestD > 320) return;
-    hero.cooldowns.reap = 15;
+    if (!best || bestD > Sim.REAP.range) return;
+    hero.cooldowns.reap = Sim.REAP.cooldown;
     if (Sim.reapExecutes(best.hp, hero.level)) {
       best.hp = 0;
       best.lastAttacker = hero;

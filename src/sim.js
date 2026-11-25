@@ -107,6 +107,9 @@ const LAST_HIT_GOLD = {
 // Gold a nearby ally receives when a minion dies without them last hitting.
 const SHARED_GOLD = 6;
 
+// Gold every champion starts the game with.
+const STARTING_GOLD = 475;
+
 // Ambient gold: every AMBIENT_GOLD_TICK seconds after AMBIENT_GOLD_START.
 const AMBIENT_GOLD_START = 60; // seconds into the game
 const AMBIENT_GOLD_TICK = 5;
@@ -157,6 +160,19 @@ function levelFromXp(xp) {
 function splitXp(amount, count) {
   if (count <= 0) return 0;
   return Math.floor(amount / count);
+}
+
+// Stat growth the game layer applies when a champion levels up.
+const LEVEL_GROWTH = Object.freeze({
+  attackDamage: 4, // per level above 1
+  maxHp: 95, // per level gained
+  maxMana: 35, // per level gained
+  levelUpHeal: 120, // HP restored on leveling up (mana refills fully)
+});
+
+// Seconds a champion stays dead after dying at `level`.
+function respawnTime(level) {
+  return 5 + level * 0.5;
 }
 
 // ---------------------------------------------------------------- camps
@@ -460,6 +476,13 @@ function selectTowerTarget(tower, candidates, now) {
 
 // Reap is the camp execute available to every champion. It deals flat true
 // damage to a camp monster, scaling with champion level.
+
+// Reap tuning shared with the game layer.
+const REAP = Object.freeze({
+  cooldown: 15, // seconds
+  range: 320, // how close the nearest camp monster must be
+});
+
 function reapDamage(championLevel) {
   return 450 + (championLevel - 1) * 40;
 }
@@ -479,6 +502,7 @@ const Sim = {
   CAMP_STATS,
   LAST_HIT_GOLD,
   SHARED_GOLD,
+  STARTING_GOLD,
   AMBIENT_GOLD_START,
   AMBIENT_GOLD_TICK,
   AMBIENT_GOLD_AMOUNT,
@@ -488,6 +512,8 @@ const Sim = {
   cumulativeXpForLevel,
   levelFromXp,
   splitXp,
+  LEVEL_GROWTH,
+  respawnTime,
   CAMP_RESPAWN,
   createCamp,
   clearCamp,
@@ -509,6 +535,7 @@ const Sim = {
   TOWER_AGGRO_WINDOW,
   towerShotDamage,
   selectTowerTarget,
+  REAP,
   reapDamage,
   reapExecutes,
 };
