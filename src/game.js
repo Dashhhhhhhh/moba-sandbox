@@ -351,7 +351,10 @@
       if (found.unit && found.distance <= m.range + found.unit.radius) {
         if (m.attackCooldown <= 0) {
           m.attackCooldown = 1.1;
-          damageUnit(found.unit, m.damage, m);
+          // Minion damage follows the same mitigation curve as every
+          // other damage source (design.md, Combat). Targets without a
+          // recorded armor stat (bloblets) take it unmitigated.
+          damageUnit(found.unit, Sim.mitigatePhysical(m.damage, found.unit.armor), m);
         }
         return;
       }

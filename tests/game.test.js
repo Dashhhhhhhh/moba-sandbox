@@ -150,6 +150,28 @@ test("basic attacks on a camp monster do not depend on touch order", function ()
   assert.ok(Math.abs(hitTouched - expected) < 0.01, "touched hit " + hitTouched);
 });
 
+test("minion attacks are mitigated by the target's armor", function () {
+  // Against the hero (32 armor). Parked at (400, 400), away from every
+  // tower and camp so only the minion and hero regen move his HP.
+  const T = loadGame();
+  parkHero(T, 400, 400);
+  T.state.minions.push(meleeMinion(T, 450, 400));
+  const hp0 = T.hero.hp; // full HP, so the frame's regen is capped away
+  step(T, 0.05);
+  const heroDrop = hp0 - T.hero.hp;
+  assert.ok(Math.abs(heroDrop - Sim.mitigatePhysical(11, 32)) < 0.01, "hero drop " + heroDrop);
+
+  // Against a tower (30 armor).
+  const T2 = loadGame();
+  parkHero(T2, 400, 400);
+  const tower = T2.state.towers.find(function (t) { return t.team === "blue" && t.lane === "mid"; });
+  T2.state.minions.push(meleeMinion(T2, tower.x + 50, tower.y));
+  const towerHp0 = tower.hp;
+  step(T2, 0.05);
+  const towerDrop = towerHp0 - tower.hp;
+  assert.ok(Math.abs(towerDrop - Sim.mitigatePhysical(11, 30)) < 0.01, "tower drop " + towerDrop);
+});
+
 test("boing barrage casts normally at level 6", function () {
   const T = loadGame();
   parkHero(T, 750, 750);
