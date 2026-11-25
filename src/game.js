@@ -917,6 +917,141 @@
     ctx.fillRect(x - w / 2, y, Math.max(0, Math.min(1, frac)) * w, 5);
   }
 
+  function drawMinimap() {
+    const mapSize = 184;
+    const panelWidth = 208;
+    const panelHeight = 228;
+    const panelX = canvas.width - panelWidth - 12;
+    const panelY = 12;
+    const mapX = panelX + 12;
+    const mapY = panelY + 17;
+
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = "rgba(8, 17, 13, 0.9)";
+    ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+    ctx.strokeStyle = "rgba(232, 227, 208, 0.75)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(panelX + 0.5, panelY + 0.5, panelWidth - 1, panelHeight - 1);
+
+    ctx.fillStyle = "#e8e3d0";
+    ctx.font = "bold 10px sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("MINIMAP", panelX + 10, panelY + 12);
+
+    ctx.fillStyle = "#284d2c";
+    ctx.fillRect(mapX, mapY, mapSize, mapSize);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(mapX, mapY, mapSize, mapSize);
+    ctx.clip();
+
+    function mapPoint(point) {
+      return {
+        x: mapX + (point.x / WORLD) * mapSize,
+        y: mapY + (point.y / WORLD) * mapSize,
+      };
+    }
+
+    const riverStart = mapPoint({ x: 40, y: 40 });
+    const riverEnd = mapPoint({ x: WORLD - 40, y: WORLD - 40 });
+    ctx.strokeStyle = "#2f6db3";
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.moveTo(riverStart.x, riverStart.y);
+    ctx.lineTo(riverEnd.x, riverEnd.y);
+    ctx.stroke();
+
+    Object.keys(LANES).forEach(function (lane) {
+      const path = LANES[lane].map(mapPoint);
+      ctx.strokeStyle = "#9c8f68";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(path[0].x, path[0].y);
+      for (let i = 1; i < path.length; i += 1) {
+        ctx.lineTo(path[i].x, path[i].y);
+      }
+      ctx.stroke();
+    });
+
+    state.camps.forEach(function (camp) {
+      const point = mapPoint(camp.def);
+      ctx.fillStyle = camp.sim.alive ? "#a5d979" : "#606a62";
+      ctx.strokeStyle = "#17251a";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      if (!camp.sim.alive) {
+        ctx.fillStyle = "#f2e7c9";
+        ctx.font = "8px sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(
+          Math.ceil(Sim.campRespawnRemaining(camp.sim, state.time)) + "s",
+          point.x + 4,
+          point.y - 3
+        );
+      }
+    });
+
+    state.minions.forEach(function (minion) {
+      if (minion.hp <= 0) return;
+      const point = mapPoint(minion);
+      ctx.fillStyle = minion.team === "blue" ? "#3a7bd5" : "#d53a3a";
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, 2, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    function drawChampionMarker(champion) {
+      const point = mapPoint(champion);
+      ctx.fillStyle = "#57c84d";
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    if (hero.split) {
+      hero.bloblets.forEach(function (bloblet) {
+        if (bloblet.hp > 0) drawChampionMarker(bloblet);
+      });
+    } else if (!hero.dead) {
+      drawChampionMarker(hero);
+    }
+    ctx.restore();
+
+    function drawLegendMarker(x, y, color) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(x, y - 2.5, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.font = "8px sans-serif";
+    ctx.textAlign = "left";
+    drawLegendMarker(panelX + 12, panelY + 213, "#57c84d");
+    ctx.fillStyle = "#e8e3d0";
+    ctx.fillText("Champion", panelX + 17, panelY + 213);
+    drawLegendMarker(panelX + 79, panelY + 213, "#3a7bd5");
+    ctx.fillStyle = "#e8e3d0";
+    ctx.fillText("Blue minion", panelX + 84, panelY + 213);
+    drawLegendMarker(panelX + 153, panelY + 213, "#d53a3a");
+    ctx.fillStyle = "#e8e3d0";
+    ctx.fillText("Red", panelX + 158, panelY + 213);
+
+    drawLegendMarker(panelX + 12, panelY + 224, "#a5d979");
+    ctx.fillStyle = "#e8e3d0";
+    ctx.fillText("Camp ready", panelX + 17, panelY + 224);
+    drawLegendMarker(panelX + 93, panelY + 224, "#606a62");
+    ctx.fillStyle = "#e8e3d0";
+    ctx.fillText("Camp respawning (timer)", panelX + 98, panelY + 224);
+    ctx.restore();
+  }
+
   function draw() {
     const scale = canvas.width / WORLD;
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
@@ -1214,6 +1349,7 @@
         WORLD / 2
       );
     }
+    drawMinimap();
   }
 
   // ------------------------------------------------------------ HUD
