@@ -85,6 +85,7 @@
     mana: heroStats.maxMana,
     baseAd: heroStats.baseAd,
     bonusAd: 0,
+    emberSigilExpiresAt: 0,
     ap: 0,
     armor: heroStats.armor,
     magicResist: heroStats.magicResist,
@@ -436,6 +437,9 @@
         Sim.clearCamp(camp.sim, state.time);
         hero.gold += camp.def.stats.gold;
         gainXp(camp.def.stats.xp);
+        if (camp.def.stats.kind === "buff") {
+          hero.emberSigilExpiresAt = Sim.applyEmberSigil(state.time);
+        }
       }
     });
   }
@@ -852,7 +856,12 @@
     if (target && targetD <= hero.attackRange + target.radius && hero.attackCooldown <= 0) {
       hero.attackCooldown = hero.attackPeriod;
       const armor = target.armor === undefined ? 10 : target.armor;
-      damageUnit(target, Sim.mitigatePhysical(heroAttackDamage(), armor), hero);
+      const attackDamage = Sim.emberSigilAttackDamage(
+        heroAttackDamage(),
+        hero.emberSigilExpiresAt,
+        state.time
+      );
+      damageUnit(target, Sim.mitigatePhysical(attackDamage, armor), hero);
     }
 
     if (hero.hp <= 0) {
@@ -1224,6 +1233,7 @@
     mana: document.getElementById("hud-mana"),
     xp: document.getElementById("hud-xp"),
     abilities: document.getElementById("hud-abilities"),
+    buff: document.getElementById("hud-buff"),
   };
 
   function fmtTime(t) {
@@ -1247,6 +1257,12 @@
     const into = hero.xp - Sim.cumulativeXpForLevel(hero.level);
     const needed = Sim.xpToNextLevel(hero.level);
     hud.xp.style.width = (100 * into) / needed + "%";
+    const sigilRemaining = Sim.emberSigilRemaining(hero.emberSigilExpiresAt, state.time);
+    hud.buff.textContent = sigilRemaining > 0
+      ? "Ember Sigil +" +
+        Math.round(Sim.EMBER_SIGIL.attackDamageBonusFraction * 100) +
+        "% attack damage (" + Math.ceil(sigilRemaining) + "s)"
+      : "";
     const qLabel = hero.grab
       ? "Q SLAM!"
       : hero.cooldowns.stretchGrab > 0

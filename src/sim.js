@@ -87,6 +87,13 @@ const CAMP_STATS = Object.freeze({
   }),
 });
 
+// Ember Sigil, earned by clearing a Crimson Brute. The pickup refreshes its
+// duration; while active it increases basic attack damage.
+const EMBER_SIGIL = Object.freeze({
+  durationSeconds: 60,
+  attackDamageBonusFraction: 0.12,
+});
+
 // ---------------------------------------------------------------- economy
 
 // Gold granted for landing the killing blow on a minion, by minion kind.
@@ -201,6 +208,22 @@ function updateCamp(camp, now) {
 function campRespawnRemaining(camp, now) {
   if (camp.alive) return 0;
   return Math.max(0, camp.respawnAt - now);
+}
+
+// Returns the expiration timestamp for a fresh or refreshed Ember Sigil.
+function applyEmberSigil(now) {
+  return now + EMBER_SIGIL.durationSeconds;
+}
+
+// Seconds remaining on the Sigil, or 0 once it has expired.
+function emberSigilRemaining(expiresAt, now) {
+  return Math.max(0, expiresAt - now);
+}
+
+// Basic attack damage with the Ember Sigil bonus while it is active.
+function emberSigilAttackDamage(baseDamage, expiresAt, now) {
+  if (emberSigilRemaining(expiresAt, now) <= 0) return baseDamage;
+  return baseDamage * (1 + EMBER_SIGIL.attackDamageBonusFraction);
 }
 
 // ---------------------------------------------------------------- combat
@@ -467,6 +490,10 @@ const Sim = {
   isCampAlive,
   updateCamp,
   campRespawnRemaining,
+  EMBER_SIGIL,
+  applyEmberSigil,
+  emberSigilRemaining,
+  emberSigilAttackDamage,
   mitigatePhysical,
   mitigateMagic,
   ABILITIES,
