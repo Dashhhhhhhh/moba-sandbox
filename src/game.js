@@ -65,6 +65,8 @@
     keys: {},
     mouse: { x: 750, y: 750 },
     moveTarget: null,
+    touchMove: { x: 0, y: 0 },
+    selectedTouchAbility: null,
     gameOver: false,
   };
 
@@ -809,6 +811,10 @@
     if (state.keys["arrowdown"]) vy += 1;
     if (state.keys["arrowleft"]) vx -= 1;
     if (state.keys["arrowright"]) vx += 1;
+    if (vx === 0 && vy === 0) {
+      vx = state.touchMove.x;
+      vy = state.touchMove.y;
+    }
     if ((vx !== 0 || vy !== 0) && !isRooted(hero) && speedNow > 0) {
       const len = Math.sqrt(vx * vx + vy * vy);
       hero.x += (vx / len) * speedNow * dt;
@@ -1226,6 +1232,7 @@
     mana: document.getElementById("hud-mana"),
     xp: document.getElementById("hud-xp"),
     abilities: document.getElementById("hud-abilities"),
+    touchHint: document.getElementById("touch-hint"),
   };
 
   function fmtTime(t) {
@@ -1269,6 +1276,11 @@
       cdText("boingBarrage", "R Boing Barrage") + "   |   " +
       "F Reap " + (hero.cooldowns.reap > 0 ? hero.cooldowns.reap.toFixed(1) : "ready") + "   |   " +
       passiveLabel;
+    if (state.selectedTouchAbility) {
+      hud.touchHint.textContent = "Tap the map to aim " + state.selectedTouchAbility.toUpperCase() + ".";
+    } else {
+      hud.touchHint.textContent = "Drag the joystick to move. Tap an ability, then tap the map to aim.";
+    }
   }
 
   // ------------------------------------------------------------ input
@@ -1281,8 +1293,109 @@
     };
   }
 
+  const touchJoystick = document.getElementById("touch-joystick");
+  const touchJoystickKnob = document.getElementById("touch-joystick-knob");
+  const touchLaunch = document.getElementById("touch-launch");
+  const touchAbilityButtons = document.querySelectorAll("[data-touch-ability]");
+  let touchJoystickPointerId = null;
+  let touchLaunchPointerId = null;
+
+  function selectTouchAbility(key) {
+    state.selectedTouchAbility = key;
+    touchAbilityButtons.forEach(function (button) {
+      if (button.getAttribute("data-touch-ability") !== "oozeBurst") {
+        button.setAttribute("aria-pressed", button.getAttribute("data-touch-ability") === key ? "true" : "false");
+      }
+    });
+  }
+
+  function updateTouchJoystick(evt) {
+    const rect = touchJoystick.getBoundingClientRect();
+    const maxOffset = rect.width * 0.3;
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    let offsetX = evt.clientX - centerX;
+    let offsetY = evt.clientY - centerY;
+    const length = Math.sqrt(offsetX * offsetX + offsetY * offsetY);
+    if (length > maxOffset) {
+      offsetX = (offsetX / length) * maxOffset;
+      offsetY = (offsetY / length) * maxOffset;
+    }
+    state.touchMove.x = offsetX / maxOffset;
+    state.touchMove.y = offsetY / maxOffset;
+    touchJoystickKnob.style.transform =
+      "translate(calc(-50% + " + offsetX + "px), calc(-50% + " + offsetY + "px))";
+  }
+
+  function releaseTouchJoystick(evt) {
+    if (evt.pointerId !== touchJoystickPointerId) return;
+    touchJoystickPointerId = null;
+    state.touchMove.x = 0;
+    state.touchMove.y = 0;
+    touchJoystickKnob.style.transform = "translate(-50%, -50%)";
+  }
+
+  touchJoystick.addEventListener("pointerdown", function (evt) {
+    if (evt.pointerType !== "touch" || touchJoystickPointerId !== null) return;
+    evt.preventDefault();
+    touchJoystickPointerId = evt.pointerId;
+    touchJoystick.setPointerCapture(evt.pointerId);
+    updateTouchJoystick(evt);
+  });
+  touchJoystick.addEventListener("pointermove", function (evt) {
+    if (evt.pointerId === touchJoystickPointerId) updateTouchJoystick(evt);
+  });
+  touchJoystick.addEventListener("pointerup", releaseTouchJoystick);
+  touchJoystick.addEventListener("pointercancel", releaseTouchJoystick);
+  touchJoystick.addEventListener("lostpointercapture", releaseTouchJoystick);
+
+  touchAbilityButtons.forEach(function (button) {
+    button.addEventListener("click", function (evt) {
+      evt.preventDefault();
+      const key = button.getAttribute("data-touch-ability");
+      if (key === "oozeBurst") {
+        selectTouchAbility(null);
+        castAbility(key);
+        return;
+      }
+      selectTouchAbility(state.selectedTouchAbility === key ? null : key);
+    });
+  });
+
+  touchLaunch.addEventListener("pointerdown", function (evt) {
+    if (evt.pointerType !== "touch" || touchLaunchPointerId !== null) return;
+    evt.preventDefault();
+    touchLaunchPointerId = evt.pointerId;
+    touchLaunch.setPointerCapture(evt.pointerId);
+    startCharge();
+  });
+  function releaseTouchLaunch(evt) {
+    if (evt.pointerId !== touchLaunchPointerId) return;
+    touchLaunchPointerId = null;
+    releaseLaunch();
+  }
+  touchLaunch.addEventListener("pointerup", releaseTouchLaunch);
+  touchLaunch.addEventListener("pointercancel", releaseTouchLaunch);
+  touchLaunch.addEventListener("lostpointercapture", releaseTouchLaunch);
+
   canvas.addEventListener("mousemove", function (evt) {
     state.mouse = canvasPos(evt);
+  });
+  canvas.addEventListener("pointermove", function (evt) {
+    if (evt.pointerType === "touch") state.mouse = canvasPos(evt);
+  });
+  canvas.addEventListener("pointerdown", function (evt) {
+    if (evt.pointerType !== "touch") return;
+    evt.preventDefault();
+    state.mouse = canvasPos(evt);
+    if (state.selectedTouchAbility) {
+      const key = state.selectedTouchAbility;
+      selectTouchAbility(null);
+      if (key === "reap") castReap();
+      else castAbility(key);
+    } else {
+      state.moveTarget = state.mouse;
+    }
   });
   canvas.addEventListener("contextmenu", function (evt) {
     evt.preventDefault();
