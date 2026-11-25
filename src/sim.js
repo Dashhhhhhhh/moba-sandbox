@@ -443,6 +443,38 @@ function reapExecutes(monsterHp, championLevel) {
   return monsterHp <= reapDamage(championLevel);
 }
 
+// Tactical thresholds for the red-side champion bot.
+const CHAMPION_BOT = {
+  retreatHealthFraction: 0.35,
+  resumeHealthFraction: 0.8,
+  campSeekRange: 250,
+};
+
+// Chooses whether the bot should return to base, clear a nearby camp, or
+// continue down its lane. `camps` contains only camps available to this bot.
+function selectChampionBotObjective(bot, camps) {
+  const healthFraction = bot.maxHp > 0 ? bot.hp / bot.maxHp : 0;
+  const retreating = bot.retreating
+    ? healthFraction < CHAMPION_BOT.resumeHealthFraction
+    : healthFraction <= CHAMPION_BOT.retreatHealthFraction;
+  if (retreating) return { type: "retreat" };
+
+  let nearestCamp = null;
+  let nearestDistance = CHAMPION_BOT.campSeekRange;
+  camps.forEach(function (camp) {
+    if (!camp.available) return;
+    const dx = bot.x - camp.x;
+    const dy = bot.y - camp.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    if (distance <= nearestDistance) {
+      nearestDistance = distance;
+      nearestCamp = camp;
+    }
+  });
+  if (nearestCamp) return { type: "camp", target: nearestCamp };
+  return { type: "lane" };
+}
+
 // ---------------------------------------------------------------- exports
 
 const Sim = {
@@ -484,6 +516,8 @@ const Sim = {
   selectTowerTarget,
   reapDamage,
   reapExecutes,
+  CHAMPION_BOT,
+  selectChampionBotObjective,
 };
 
 if (typeof module !== "undefined" && module.exports) {
