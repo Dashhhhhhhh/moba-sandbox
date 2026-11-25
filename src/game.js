@@ -60,12 +60,13 @@
     projectiles: [],
     chunks: [],
     towers: [],
+    structures: [],
     tracers: [],
     camps: [],
     keys: {},
     mouse: { x: 750, y: 750 },
     moveTarget: null,
-    gameOver: false,
+    gameOver: null,
   };
 
   const heroDefinition = Sim.getChampionDefinition("bloop");
@@ -198,7 +199,32 @@
   Object.keys(LANES).forEach(function (lane) {
     state.towers.push(makeTower("blue", lane, lanePoint(LANES[lane], 0.35)));
     state.towers.push(makeTower("red", lane, lanePoint(LANES[lane], 0.65)));
+    ["blue", "red"].forEach(function (team) {
+      const path = team === "blue" ? LANES[lane] : LANES[lane].slice().reverse();
+      const wardstone = Sim.createStructure("wardstone", team, lane);
+      const pos = lanePoint(path, 0.82);
+      wardstone.x = pos.x;
+      wardstone.y = pos.y;
+      state.structures.push(wardstone);
+    });
   });
+  ["blue", "red"].forEach(function (team) {
+    const heartspire = Sim.createStructure("heartspire", team);
+    const base = team === "blue" ? BLUE_BASE : RED_BASE;
+    heartspire.x = base.x;
+    heartspire.y = base.y;
+    state.structures.push(heartspire);
+  });
+
+  function isStructureVulnerable(structure) {
+    return Sim.isStructureVulnerable(
+      structure,
+      state.towers,
+      state.structures.filter(function (candidate) {
+        return candidate.kind === "wardstone";
+      })
+    );
+  }
 
   // ------------------------------------------------------------ helpers
 
@@ -233,7 +259,15 @@
   }
 
   function damageUnit(unit, amount, attacker) {
-    unit.hp -= amount;
+    if (state.gameOver) return;
+    if (unit.kind === "wardstone" || unit.kind === "heartspire") {
+      const destroyed = Sim.damageStructure(unit, amount);
+      if (destroyed && unit.kind === "heartspire") {
+        state.gameOver = { winner: attacker ? attacker.team : unit.team === "blue" ? "red" : "blue" };
+      }
+    } else {
+      unit.hp -= amount;
+    }
     unit.lastAttacker = attacker;
     // Tower aggro bookkeeping: a champion who hurts an enemy champion
     // while both are under one of that champion's towers earns those
@@ -301,14 +335,22 @@
         best = other;
       }
     });
-    // Enemy towers are valid targets too: a wave marches until it can
-    // chew on one.
+    // Enemy structures are valid targets too: a wave marches until it can
+    // chew on the next available objective.
     state.towers.forEach(function (t) {
       if (t.team === m.team || t.hp <= 0) return;
       const d = dist(m, t);
       if (d < bestD) {
         bestD = d;
         best = t;
+      }
+    });
+    state.structures.forEach(function (structure) {
+      if (structure.team === m.team || structure.hp <= 0 || !isStructureVulnerable(structure)) return;
+      const d = dist(m, structure);
+      if (d < bestD) {
+        bestD = d;
+        best = structure;
       }
     });
     // The hero is a valid target for red minions, except while he is
@@ -849,10 +891,21 @@
         target = t;
       }
     });
+    state.structures.forEach(function (structure) {
+      if (structure.team === hero.team || structure.hp <= 0 || !isStructureVulnerable(structure)) return;
+      const d = dist(hero, structure);
+      if (d < targetD) {
+        targetD = d;
+        target = structure;
+      }
+    });
     if (target && targetD <= hero.attackRange + target.radius && hero.attackCooldown <= 0) {
       hero.attackCooldown = hero.attackPeriod;
       const armor = target.armor === undefined ? 10 : target.armor;
-      damageUnit(target, Sim.mitigatePhysical(heroAttackDamage(), armor), hero);
+      const damage = target.kind === "wardstone" || target.kind === "heartspire"
+        ? heroAttackDamage()
+        : Sim.mitigatePhysical(heroAttackDamage(), armor);
+      damageUnit(target, damage, hero);
     }
 
     if (hero.hp <= 0) {
@@ -1036,6 +1089,31 @@
       drawBar(t.x, t.y - t.radius - 14, 52, t.hp / t.maxHp, t.team === "blue" ? "#3a7bd5" : "#d53a3a");
     });
 
+    // Wardstones and Heartspires remain as rubble after they fall.
+    state.structures.forEach(function (structure) {
+      const color = structure.team === "blue" ? "#3a7bd5" : "#d53a3a";
+      if (structure.hp <= 0) {
+        ctx.fillStyle = "#5a5348";
+        ctx.beginPath();
+        ctx.arc(structure.x, structure.y, structure.radius, 0, Math.PI * 2);
+        ctx.fill();
+        return;
+      }
+      ctx.fillStyle = structure.kind === "heartspire" ? "#d9c77a" : "#79a9c7";
+      ctx.beginPath();
+      ctx.arc(structure.x, structure.y, structure.radius + 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(structure.x, structure.y, structure.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 11px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(structure.kind === "heartspire" ? "Heartspire" : "Wardstone", structure.x, structure.y + 4);
+      drawBar(structure.x, structure.y - structure.radius - 14, 58, structure.hp / structure.maxHp, color);
+    });
+
     // Tower shot tracers.
     state.tracers.forEach(function (tr) {
       ctx.strokeStyle = tr.team === "blue" ? "rgba(120,180,255,0.9)" : "rgba(255,120,120,0.9)";
@@ -1212,6 +1290,17 @@
         WORLD / 2
       );
     }
+
+    if (state.gameOver) {
+      ctx.fillStyle = "rgba(0, 0, 0, 0.72)";
+      ctx.fillRect(0, 0, WORLD, WORLD);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 52px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(state.gameOver.winner === "blue" ? "DAWN WINS" : "DUSK WINS", WORLD / 2, WORLD / 2 - 12);
+      ctx.font = "22px sans-serif";
+      ctx.fillText("The enemy Heartspire has fallen.", WORLD / 2, WORLD / 2 + 32);
+    }
   }
 
   // ------------------------------------------------------------ HUD
@@ -1224,6 +1313,7 @@
     mana: document.getElementById("hud-mana"),
     xp: document.getElementById("hud-xp"),
     abilities: document.getElementById("hud-abilities"),
+    objective: document.getElementById("hud-objective"),
   };
 
   function fmtTime(t) {
@@ -1247,6 +1337,17 @@
     const into = hero.xp - Sim.cumulativeXpForLevel(hero.level);
     const needed = Sim.xpToNextLevel(hero.level);
     hud.xp.style.width = (100 * into) / needed + "%";
+    const brokenWardstones = state.structures.filter(function (structure) {
+      return structure.kind === "wardstone" && structure.team === "red" && structure.hp <= 0;
+    }).length;
+    const totalWardstones = state.structures.filter(function (structure) {
+      return structure.kind === "wardstone" && structure.team === "red";
+    }).length;
+    hud.objective.textContent = state.gameOver
+      ? (state.gameOver.winner === "blue" ? "Victory" : "Defeat")
+      : brokenWardstones > 0
+        ? "Red Heartspire exposed (" + brokenWardstones + "/" + totalWardstones + ")"
+        : "Red Wardstones " + brokenWardstones + "/" + totalWardstones;
     const qLabel = hero.grab
       ? "Q SLAM!"
       : hero.cooldowns.stretchGrab > 0
@@ -1287,6 +1388,7 @@
     state.moveTarget = canvasPos(evt);
   });
   window.addEventListener("keydown", function (evt) {
+    if (state.gameOver) return;
     const k = evt.key.toLowerCase();
     state.keys[k] = true;
     if (k === "q") castAbility("stretchGrab");
@@ -1309,12 +1411,14 @@
     if (lastTs === null) lastTs = ts;
     const dt = Math.min(0.05, (ts - lastTs) / 1000);
     lastTs = ts;
-    state.time += dt;
-    updateHero(dt);
-    updateMinions(dt);
-    updateCamps(dt);
-    updateTowers(dt);
-    updateProjectiles(dt);
+    if (!state.gameOver) {
+      state.time += dt;
+      updateHero(dt);
+      updateMinions(dt);
+      updateCamps(dt);
+      updateTowers(dt);
+      updateProjectiles(dt);
+    }
     draw();
     updateHud();
     requestAnimationFrame(frame);

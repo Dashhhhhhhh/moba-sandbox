@@ -101,6 +101,20 @@ is original to this project.
   in the prototype. A destroyed tower stays on the map as rubble and no
   longer shoots.
 
+### Wardstones and Heartspires
+
+- Each lane has one Wardstone for each team, positioned at 82% of that
+  team's lane path from its own base. A Wardstone has 2200 HP, 30 armor,
+  and a 28-unit radius. It becomes vulnerable only after its lane tower
+  is destroyed. Basic attacks and minion attacks damage it; abilities do
+  not damage structures.
+- Each base has a Heartspire with 5000 HP, 40 armor, and a 42-unit radius.
+  Destroying any one of the opposing team's Wardstones exposes that team's
+  Heartspire. The Heartspire can then be damaged by basic and minion
+  attacks. Destroying the enemy Heartspire ends the game and determines
+  the winner; the simulation then freezes.
+- Destroyed Wardstones and Heartspires remain on the map as rubble.
+
 ### Reap (the camp execute)
 
 - Every champion has Reap on the F key: a camp-monster execute.
@@ -155,11 +169,9 @@ slingshotting himself into fights. Base stats in the prototype: 680 HP,
 
 ## Win condition
 
-Destroy the enemy Heartspire. In the current sandbox prototype the lane
-towers exist (GAME-001, done) but Heartspires do not, so there is still no
-win or loss; the prototype is for practicing movement, last-hitting, camp
-clears, and pushing lanes into towers. Heartspires and the win condition
-are GAME-009 on the coordination board.
+Destroy the enemy Heartspire. Lane towers must be destroyed before the
+Wardstone in that lane can be attacked. Breaking any Wardstone exposes the
+enemy Heartspire, and destroying it wins the game.
 
 ## Sandbox scope
 
