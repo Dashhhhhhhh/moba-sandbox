@@ -161,10 +161,22 @@ win or loss; the prototype is for practicing movement, last-hitting, camp
 clears, and pushing lanes into towers. Heartspires and the win condition
 are GAME-009 on the coordination board.
 
+## Enemy champion bot
+
+- One red-side champion follows the mid lane toward the blue base and uses
+  basic attacks against nearby blue minions, the player, and blue towers.
+- The bot has Bloop's base combat stats and levels from minion and camp XP.
+- It diverts to the nearest available red-side camp within 250 units of its
+  current position, then resumes its lane route after the camp is cleared.
+- At 35% health or lower it retreats to the Dusk base and heals there. It
+  resumes lane and camp duties at 80% health.
+- The bot respawns at its base after the same level-scaled delay as Bloop.
+
 ## Sandbox scope
 
 - Single player controlling one champion, plus simple scripted bots:
-  allied and enemy minion waves, and camp monsters that fight back.
+  allied and enemy minion waves, camp monsters that fight back, and one
+  red-side champion bot.
 - No networking, no accounts, no items, no shop in the prototype.
 - Enemy champion bots are GAME-003. Lane towers shipped with GAME-001.
 
