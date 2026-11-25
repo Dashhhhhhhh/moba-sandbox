@@ -16,6 +16,14 @@
   #hud-xp { background: #9b59b6; height: 6px; }
   #hud-top { display: flex; gap: 18px; font-weight: bold; margin: 6px 0; }
   #hud-abilities { font-size: 13px; margin-top: 6px; }
+  #scoreboard-toggle { margin-top: 8px; padding: 6px 10px; background: #263b2b; color: #e8e3d0; border: 1px solid #71806d; cursor: pointer; }
+  #match-scoreboard { margin-top: 8px; padding: 10px; background: #1d3022; border: 1px solid #52634f; overflow-x: auto; }
+  #match-scoreboard[hidden] { display: none; }
+  #match-scoreboard h2 { font-size: 16px; margin: 0 0 8px; }
+  #match-scoreboard table { width: 100%; border-collapse: collapse; text-align: right; white-space: nowrap; }
+  #match-scoreboard th, #match-scoreboard td { padding: 5px 8px; border-bottom: 1px solid #3b4e3b; }
+  #match-scoreboard th:first-child, #match-scoreboard td:first-child { text-align: left; }
+  #scoreboard-note { margin: 8px 0 0; font-size: 12px; color: #b9bfae; }
   p.help { font-size: 13px; color: #b9bfae; }
 </style>
 </head>
@@ -32,6 +40,41 @@
   <div class="bar"><div id="hud-mana" style="width:100%"></div></div>
   <div class="bar" id="hud-xpbar"><div id="hud-xp" style="width:0%"></div></div>
   <div id="hud-abilities"></div>
+  <button id="scoreboard-toggle" type="button" aria-controls="match-scoreboard" aria-expanded="false">Scoreboard (Tab)</button>
+  <section id="match-scoreboard" aria-labelledby="scoreboard-title" hidden>
+    <h2 id="scoreboard-title">Match stats</h2>
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Side / champion</th>
+          <th scope="col">Kills</th>
+          <th scope="col">Deaths</th>
+          <th scope="col">Gold</th>
+          <th scope="col">XP</th>
+          <th scope="col">Camp clears</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">Dawn / Bloop</th>
+          <td id="score-blue-kills">0</td>
+          <td id="score-blue-deaths">0</td>
+          <td id="score-blue-gold">475</td>
+          <td id="score-blue-xp">0</td>
+          <td id="score-blue-camps">0</td>
+        </tr>
+        <tr>
+          <th scope="row">Dusk / no champion</th>
+          <td>0</td>
+          <td>0</td>
+          <td>0</td>
+          <td>0</td>
+          <td>0</td>
+        </tr>
+      </tbody>
+    </table>
+    <p id="scoreboard-note">Dusk has no champion in this prototype, so its stats remain at zero.</p>
+  </section>
   <p class="help">
     Move: arrow keys or right-click. Aim with the mouse. Abilities: Q Stretch
     Grab (cast to grab an enemy, cast again to slam it), W Ooze Burst,
