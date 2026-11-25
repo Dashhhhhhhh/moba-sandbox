@@ -43,9 +43,9 @@ function getChampionDefinition(championKey) {
 // Combat and reward stats for lane minions and jungle camps. Map positions
 // and display names are owned by the browser layer.
 const MINION_STATS = Object.freeze({
-  melee: Object.freeze({ hp: 480, damage: 11, range: 105, radius: 13, speed: 105 }),
-  caster: Object.freeze({ hp: 290, damage: 16, range: 280, radius: 12, speed: 105 }),
-  siege: Object.freeze({ hp: 850, damage: 22, range: 120, radius: 17, speed: 95 }),
+  melee: Object.freeze({ hp: 480, damage: 11, range: 105, radius: 13, speed: 105, armor: 0, magicResist: 0 }),
+  caster: Object.freeze({ hp: 290, damage: 16, range: 280, radius: 12, speed: 105, armor: 0, magicResist: 0 }),
+  siege: Object.freeze({ hp: 850, damage: 22, range: 120, radius: 17, speed: 95, armor: 0, magicResist: 0 }),
 });
 
 const CAMP_STATS = Object.freeze({
@@ -208,6 +208,10 @@ function campRespawnRemaining(camp, now) {
 // Physical damage after armor mitigation. Armor can be negative, which
 // amplifies damage; the negative branch uses the mirrored formula.
 function mitigatePhysical(rawDamage, armor) {
+  // A target with no recorded defense stat takes unmitigated damage.
+  // Without this guard an undefined stat produced NaN damage, which the
+  // game layer then read as a kill and paid out rewards for.
+  if (typeof armor !== "number" || Number.isNaN(armor)) armor = 0;
   if (armor >= 0) return rawDamage * (100 / (100 + armor));
   return rawDamage * (2 - 100 / (100 - armor));
 }

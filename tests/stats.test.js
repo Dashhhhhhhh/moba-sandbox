@@ -36,9 +36,9 @@ test("unknown champion definitions throw", function () {
 
 test("minion combat stats are available from the simulation catalog", function () {
   assert.deepEqual(Sim.MINION_STATS, {
-    melee: { hp: 480, damage: 11, range: 105, radius: 13, speed: 105 },
-    caster: { hp: 290, damage: 16, range: 280, radius: 12, speed: 105 },
-    siege: { hp: 850, damage: 22, range: 120, radius: 17, speed: 95 },
+    melee: { hp: 480, damage: 11, range: 105, radius: 13, speed: 105, armor: 0, magicResist: 0 },
+    caster: { hp: 290, damage: 16, range: 280, radius: 12, speed: 105, armor: 0, magicResist: 0 },
+    siege: { hp: 850, damage: 22, range: 120, radius: 17, speed: 95, armor: 0, magicResist: 0 },
   });
   assert.equal(Object.isFrozen(Sim.MINION_STATS.melee), true);
 });
