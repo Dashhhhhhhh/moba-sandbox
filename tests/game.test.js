@@ -218,6 +218,25 @@ test("lethal damage during elastic launch flight kills before landing", function
   assert.equal(bystander.hp, bystander.maxHp); // no landing damage, no auto-attack
 });
 
+test("death clears the move target, so respawn does not walk it back", function () {
+  const T = loadGame();
+  parkHero(T, 750, 750);
+  T.hero.passiveReadyAt = Infinity;
+  T.state.moveTarget = { x: 200, y: 200 };
+  T.hero.hp = -5;
+  step(T, 0.05);
+  assert.equal(T.hero.dead, true);
+  assert.equal(T.state.moveTarget, null);
+  let guard = 0;
+  while (T.hero.dead && guard < 400) { step(T, 0.05); guard += 1; }
+  assert.equal(T.hero.dead, false);
+  const rx = T.hero.x;
+  const ry = T.hero.y;
+  step(T, 2);
+  const moved = Math.sqrt((T.hero.x - rx) * (T.hero.x - rx) + (T.hero.y - ry) * (T.hero.y - ry));
+  assert.ok(moved < 1, "hero walked " + moved + " units after respawn");
+});
+
 test("boing barrage casts normally at level 6", function () {
   const T = loadGame();
   parkHero(T, 750, 750);

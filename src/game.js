@@ -654,6 +654,7 @@
   function killHero() {
     hero.dead = true;
     hero.deaths += 1;
+    state.moveTarget = null; // no walking back to a pre-death click
     hero.split = false;
     hero.bloblets = [];
     hero.grab = null;
