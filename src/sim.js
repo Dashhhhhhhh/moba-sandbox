@@ -32,6 +32,20 @@ const MINION_XP = {
   siege: 90,
 };
 
+// Returns the blue and red wave composition and route for every lane.
+function minionWaveGroups(lanes, waveNumber) {
+  const kinds = ["melee", "melee", "melee", "caster", "caster", "caster"];
+  if (waveNumber % 3 === 0) kinds.push("siege");
+
+  const groups = [];
+  Object.keys(lanes).forEach(function (lane) {
+    const path = lanes[lane];
+    groups.push({ lane: lane, team: "blue", path: path.slice(), kinds: kinds.slice() });
+    groups.push({ lane: lane, team: "red", path: path.slice().reverse(), kinds: kinds.slice() });
+  });
+  return groups;
+}
+
 // XP needed to go from `level` to `level + 1`. Level 1 is the start.
 function xpToNextLevel(level) {
   return 180 + (level - 1) * 90;
@@ -359,6 +373,7 @@ const Sim = {
   AMBIENT_GOLD_TICK,
   AMBIENT_GOLD_AMOUNT,
   MINION_XP,
+  minionWaveGroups,
   xpToNextLevel,
   cumulativeXpForLevel,
   levelFromXp,
