@@ -11,8 +11,8 @@ else is original. Every name, champion, ability, and line of text in this
 repository was invented for this project.
 
 **Status: playable sandbox prototype.** You control one champion against
-minion waves and jungle camps. There are no items, enemy champions, or win
-condition yet; those are tracked on the work board (see
+minion waves, jungle camps, and a simple red-side champion bot. There are no
+items or win condition yet; those are tracked on the work board (see
 [How development works](#how-development-works)).
 
 ## Features
@@ -33,10 +33,11 @@ What works today:
   champion under a tower draws its fire, then minions, then champions
 - Gold, XP, and levels, with ability ranks that grow as you level
 - One playable champion, **Bloop, the Bounceback Blob** (below)
+- One red-side champion bot that lanes, retreats to recover, and clears camps
 - Death and respawn, plus Bloop's bloblet revive
 
-Not built yet, all on the work board: items and a shop, enemy champion
-bots, epic boss encounters in the river pits (Gorehorn and Vessikar),
+Not built yet, all on the work board: items and a shop, epic boss encounters
+in the river pits (Gorehorn and Vessikar),
 Heartspires and the win condition, the Ember Sigil buff, a minimap, and a
 scoreboard.
 
