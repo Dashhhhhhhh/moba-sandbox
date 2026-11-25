@@ -35,7 +35,10 @@ You play **Bloop, the Bounceback Blob**, the first champion: a green slime
 tank whose passive drops healing gel chunks when he is hurt and splits him
 into bloblets instead of letting him die. The design contract in
 [docs/design.md](docs/design.md) documents every mechanic and number in
-the game.
+the game. Champion, minion, and camp balance stats are stored in the shared
+simulation catalog.
+the [CommunityDragon documentation](https://communitydragon.org/docs) is
+used only as a structural reference, not as a source of copied game data.
 
 ## Run the tests
 

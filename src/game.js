@@ -37,16 +37,17 @@
   };
 
   // Camp definitions. Positions are in world units. Red side camps are the
-  // mirror of blue side camps through the map centre.
+  // mirror of blue side camps through the map centre. Balance data lives in
+  // Sim.CAMP_STATS.
   const CAMP_DEFS = [
-    { id: "blue-buff", name: "Crimson Brute", kind: "buff", x: 420, y: 1080, monsters: 1, monsterHp: 950, monsterDamage: 22, gold: 90, xp: 120 },
-    { id: "blue-wolves", name: "Ember Wolves", kind: "small", x: 300, y: 900, monsters: 2, monsterHp: 520, monsterDamage: 11, gold: 70, xp: 95 },
-    { id: "blue-golems", name: "Stone Golems", kind: "small", x: 560, y: 1240, monsters: 2, monsterHp: 640, monsterDamage: 13, gold: 75, xp: 100 },
-    { id: "blue-thorn", name: "Thornbacks", kind: "small", x: 700, y: 950, monsters: 2, monsterHp: 480, monsterDamage: 12, gold: 65, xp: 90 },
-    { id: "red-buff", name: "Crimson Brute", kind: "buff", x: 1080, y: 420, monsters: 1, monsterHp: 950, monsterDamage: 22, gold: 90, xp: 120 },
-    { id: "red-wolves", name: "Ember Wolves", kind: "small", x: 1200, y: 600, monsters: 2, monsterHp: 520, monsterDamage: 11, gold: 70, xp: 95 },
-    { id: "red-golems", name: "Stone Golems", kind: "small", x: 940, y: 260, monsters: 2, monsterHp: 640, monsterDamage: 13, gold: 75, xp: 100 },
-    { id: "red-thorn", name: "Thornbacks", kind: "small", x: 800, y: 550, monsters: 2, monsterHp: 480, monsterDamage: 12, gold: 65, xp: 90 },
+    { id: "blue-buff", name: "Crimson Brute", x: 420, y: 1080, stats: Sim.CAMP_STATS.buff },
+    { id: "blue-wolves", name: "Ember Wolves", x: 300, y: 900, stats: Sim.CAMP_STATS.wolves },
+    { id: "blue-golems", name: "Stone Golems", x: 560, y: 1240, stats: Sim.CAMP_STATS.golems },
+    { id: "blue-thorn", name: "Thornbacks", x: 700, y: 950, stats: Sim.CAMP_STATS.thornbacks },
+    { id: "red-buff", name: "Crimson Brute", x: 1080, y: 420, stats: Sim.CAMP_STATS.buff },
+    { id: "red-wolves", name: "Ember Wolves", x: 1200, y: 600, stats: Sim.CAMP_STATS.wolves },
+    { id: "red-golems", name: "Stone Golems", x: 940, y: 260, stats: Sim.CAMP_STATS.golems },
+    { id: "red-thorn", name: "Thornbacks", x: 800, y: 550, stats: Sim.CAMP_STATS.thornbacks },
   ];
 
   // ------------------------------------------------------------ state
@@ -67,27 +68,30 @@
     gameOver: false,
   };
 
+  const heroDefinition = Sim.getChampionDefinition("bloop");
+  const heroStats = heroDefinition.baseStats;
   const hero = {
     name: "Bloop",
+    displayName: heroDefinition.displayName,
     team: "blue",
     isChampion: true,
     towerAggro: null, // { towerId, at } set when he earns a tower's attention
     x: BLUE_BASE.x + 60,
     y: BLUE_BASE.y - 60,
     radius: 20,
-    maxHp: 680,
-    hp: 680,
-    maxMana: 300,
-    mana: 300,
-    baseAd: 62,
+    maxHp: heroStats.maxHp,
+    hp: heroStats.maxHp,
+    maxMana: heroStats.maxMana,
+    mana: heroStats.maxMana,
+    baseAd: heroStats.baseAd,
     bonusAd: 0,
     ap: 0,
-    armor: 32,
-    magicResist: 32,
-    moveSpeed: 335,
-    attackRange: 150,
+    armor: heroStats.armor,
+    magicResist: heroStats.magicResist,
+    moveSpeed: heroStats.moveSpeed,
+    attackRange: heroStats.attackRange,
     attackCooldown: 0,
-    attackPeriod: 0.9,
+    attackPeriod: heroStats.attackPeriod,
     xp: 0,
     level: 1,
     gold: 475,
@@ -98,7 +102,7 @@
     rootUntil: 0,
     cooldowns: { stretchGrab: 0, oozeBurst: 0, elasticLaunch: 0, boingBarrage: 0, reap: 0 },
     // Loose Gel passive state.
-    lastHp: 680,
+    lastHp: heroStats.maxHp,
     chunkCd: 0,
     passiveReadyAt: 0,
     split: false,
@@ -120,26 +124,27 @@
   state.camps = CAMP_DEFS.map(function (def) {
     return {
       def: def,
-      sim: Sim.createCamp(def.kind),
+      sim: Sim.createCamp(def.stats.kind),
       monsters: [],
     };
   });
 
   function spawnCampMonsters(camp) {
+    const stats = camp.def.stats;
     camp.monsters = [];
-    for (let i = 0; i < camp.def.monsters; i += 1) {
-      const angle = (i / Math.max(1, camp.def.monsters)) * Math.PI * 2;
-      const offset = camp.def.monsters === 1 ? 0 : 34;
+    for (let i = 0; i < stats.monsters; i += 1) {
+      const angle = (i / Math.max(1, stats.monsters)) * Math.PI * 2;
+      const offset = stats.monsters === 1 ? 0 : 34;
       camp.monsters.push({
         camp: camp,
         x: camp.def.x + Math.cos(angle) * offset,
         y: camp.def.y + Math.sin(angle) * offset,
         homeX: camp.def.x + Math.cos(angle) * offset,
         homeY: camp.def.y + Math.sin(angle) * offset,
-        radius: camp.def.kind === "buff" ? 24 : 17,
-        maxHp: camp.def.monsterHp,
-        hp: camp.def.monsterHp,
-        damage: camp.def.monsterDamage,
+        radius: stats.monsterRadius,
+        maxHp: stats.monsterHp,
+        hp: stats.monsterHp,
+        damage: stats.monsterDamage,
         attackCooldown: 0,
         rootUntil: 0,
         alive: true,
@@ -259,17 +264,11 @@
 
   // ------------------------------------------------------------ minions
 
-  const MINION_STATS = {
-    melee: { hp: 480, damage: 11, range: 105, radius: 13, speed: 105 },
-    caster: { hp: 290, damage: 16, range: 280, radius: 12, speed: 105 },
-    siege: { hp: 850, damage: 22, range: 120, radius: 17, speed: 95 },
-  };
-
   function spawnWave() {
     state.waveCount += 1;
     Sim.minionWaveGroups(LANES, state.waveCount).forEach(function (group) {
       group.kinds.forEach(function (kind, i) {
-        const s = MINION_STATS[kind];
+        const s = Sim.MINION_STATS[kind];
         state.minions.push({
           team: group.team,
           kind: kind,
@@ -435,8 +434,8 @@
       });
       if (allDead) {
         Sim.clearCamp(camp.sim, state.time);
-        hero.gold += camp.def.gold;
-        gainXp(camp.def.xp);
+        hero.gold += camp.def.stats.gold;
+        gainXp(camp.def.stats.xp);
       }
     });
   }
@@ -1005,7 +1004,7 @@
       ctx.fillText(camp.def.name, camp.def.x, camp.def.y - 52);
       camp.monsters.forEach(function (mon) {
         if (mon.hp <= 0) return;
-        ctx.fillStyle = camp.def.kind === "buff" ? "#b3541e" : "#7a6a53";
+        ctx.fillStyle = camp.def.stats.kind === "buff" ? "#b3541e" : "#7a6a53";
         ctx.beginPath();
         ctx.arc(mon.x, mon.y, mon.radius, 0, Math.PI * 2);
         ctx.fill();
@@ -1240,7 +1239,7 @@
   }
 
   function updateHud() {
-    hud.level.textContent = "Level " + hero.level + "  Bloop, the Bounceback Blob";
+    hud.level.textContent = "Level " + hero.level + "  " + hero.displayName;
     hud.gold.textContent = "Gold " + Math.floor(hero.gold);
     hud.time.textContent = fmtTime(state.time);
     hud.hp.style.width = (100 * hero.hp) / hero.maxHp + "%";

@@ -8,6 +8,85 @@
  * here and update docs/design.md in the same pull request.
  */
 
+// ----------------------------------------------------------- champion data
+
+// Original Shatterlane champion definitions. Keep base stats here so the
+// browser game and headless tools use the same source of truth.
+const CHAMPIONS = Object.freeze({
+  bloop: Object.freeze({
+    displayName: "Bloop, the Bounceback Blob",
+    baseStats: Object.freeze({
+      maxHp: 680,
+      maxMana: 300,
+      baseAd: 62,
+      armor: 32,
+      magicResist: 32,
+      moveSpeed: 335,
+      attackRange: 150,
+      attackPeriod: 0.9,
+    }),
+  }),
+});
+
+// Returns a copy of the definition so runtime state cannot mutate the catalog.
+function getChampionDefinition(championKey) {
+  if (!Object.prototype.hasOwnProperty.call(CHAMPIONS, championKey)) {
+    throw new Error("unknown champion: " + championKey);
+  }
+  const definition = CHAMPIONS[championKey];
+  return {
+    displayName: definition.displayName,
+    baseStats: Object.assign({}, definition.baseStats),
+  };
+}
+
+// Combat and reward stats for lane minions and jungle camps. Map positions
+// and display names are owned by the browser layer.
+const MINION_STATS = Object.freeze({
+  melee: Object.freeze({ hp: 480, damage: 11, range: 105, radius: 13, speed: 105 }),
+  caster: Object.freeze({ hp: 290, damage: 16, range: 280, radius: 12, speed: 105 }),
+  siege: Object.freeze({ hp: 850, damage: 22, range: 120, radius: 17, speed: 95 }),
+});
+
+const CAMP_STATS = Object.freeze({
+  buff: Object.freeze({
+    kind: "buff",
+    monsters: 1,
+    monsterHp: 950,
+    monsterDamage: 22,
+    monsterRadius: 24,
+    gold: 90,
+    xp: 120,
+  }),
+  wolves: Object.freeze({
+    kind: "small",
+    monsters: 2,
+    monsterHp: 520,
+    monsterDamage: 11,
+    monsterRadius: 17,
+    gold: 70,
+    xp: 95,
+  }),
+  golems: Object.freeze({
+    kind: "small",
+    monsters: 2,
+    monsterHp: 640,
+    monsterDamage: 13,
+    monsterRadius: 17,
+    gold: 75,
+    xp: 100,
+  }),
+  thornbacks: Object.freeze({
+    kind: "small",
+    monsters: 2,
+    monsterHp: 480,
+    monsterDamage: 12,
+    monsterRadius: 17,
+    gold: 65,
+    xp: 90,
+  }),
+});
+
 // ---------------------------------------------------------------- economy
 
 // Gold granted for landing the killing blow on a minion, by minion kind.
@@ -367,6 +446,10 @@ function reapExecutes(monsterHp, championLevel) {
 // ---------------------------------------------------------------- exports
 
 const Sim = {
+  CHAMPIONS,
+  getChampionDefinition,
+  MINION_STATS,
+  CAMP_STATS,
   LAST_HIT_GOLD,
   SHARED_GOLD,
   AMBIENT_GOLD_START,
