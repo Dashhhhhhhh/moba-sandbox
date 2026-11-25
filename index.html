@@ -8,7 +8,78 @@
   body { margin: 0; background: #14231a; color: #e8e3d0; font-family: sans-serif; }
   #wrap { max-width: 900px; margin: 0 auto; padding: 12px; }
   h1 { font-size: 20px; margin: 4px 0 8px; }
+  #game-stage { position: relative; }
   canvas { width: 100%; background: #2e5d33; border: 2px solid #0d1a10; display: block; }
+  #game { touch-action: none; }
+  .touch-controls { display: none; position: absolute; inset: 0; }
+  .touch-joystick {
+    position: absolute;
+    left: 12px;
+    bottom: 12px;
+    width: clamp(88px, 29vw, 124px);
+    aspect-ratio: 1;
+    border: 2px solid rgba(232, 227, 208, 0.55);
+    border-radius: 50%;
+    background: rgba(10, 20, 12, 0.52);
+    pointer-events: auto;
+    touch-action: none;
+  }
+  .touch-joystick-knob {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 42%;
+    height: 42%;
+    border: 2px solid rgba(232, 227, 208, 0.9);
+    border-radius: 50%;
+    background: rgba(87, 200, 77, 0.78);
+    transform: translate(-50%, -50%);
+  }
+  .touch-panel {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    width: 158px;
+    text-align: center;
+    pointer-events: auto;
+  }
+  #touch-abilities {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    justify-items: center;
+  }
+  #touch-abilities button {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 2px solid #c9d4c2;
+    border-radius: 50%;
+    background: rgba(17, 34, 20, 0.9);
+    color: #fff;
+    font: bold 16px sans-serif;
+    pointer-events: auto;
+    touch-action: none;
+  }
+  #touch-abilities button[aria-pressed="true"] {
+    border-color: #9df28f;
+    background: #356b3a;
+    box-shadow: 0 0 0 2px rgba(157, 242, 143, 0.45);
+  }
+  #touch-hint {
+    display: block;
+    margin-top: 6px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    background: rgba(10, 20, 12, 0.72);
+    color: #fff;
+    font-size: 11px;
+    line-height: 1.25;
+    pointer-events: none;
+  }
+  @media (pointer: coarse), (hover: none) {
+    .touch-controls { display: block; pointer-events: none; }
+  }
   .bar { height: 12px; background: rgba(0,0,0,0.5); margin: 4px 0; position: relative; }
   .bar > div { height: 100%; }
   #hud-hp { background: #3fae4a; }
@@ -22,7 +93,24 @@
 <body>
 <div id="wrap">
   <h1>Shatterlane - sandbox prototype</h1>
-  <canvas id="game" width="900" height="900"></canvas>
+  <div id="game-stage">
+    <canvas id="game" width="900" height="900"></canvas>
+    <div class="touch-controls">
+      <div id="touch-joystick" class="touch-joystick" role="group" aria-label="Movement joystick">
+        <div id="touch-joystick-knob" class="touch-joystick-knob"></div>
+      </div>
+      <div class="touch-panel">
+        <div id="touch-abilities" role="group" aria-label="Touch abilities">
+          <button type="button" data-touch-ability="stretchGrab" aria-label="Stretch Grab (Q)" aria-pressed="false">Q</button>
+          <button type="button" data-touch-ability="oozeBurst" aria-label="Ooze Burst (W)">W</button>
+          <button type="button" id="touch-launch" aria-label="Elastic Launch (hold to charge, E)">E</button>
+          <button type="button" data-touch-ability="boingBarrage" aria-label="Boing Barrage (R)" aria-pressed="false">R</button>
+          <button type="button" data-touch-ability="reap" aria-label="Reap (F)" aria-pressed="false">F</button>
+        </div>
+        <span id="touch-hint" aria-live="polite">Drag the joystick to move. Tap an ability, then tap the map to aim.</span>
+      </div>
+    </div>
+  </div>
   <div id="hud-top">
     <span id="hud-level">Level 1</span>
     <span id="hud-gold">Gold 0</span>
@@ -41,7 +129,8 @@
     bloblets: keep at least one alive for 6 seconds to revive. Your champion
     auto-attacks the nearest enemy in range. Clear jungle camps, last-hit
     red minions, and level up. Push with your wave to take down the red
-    towers; enemy champions and epic bosses are on the work board.
+    towers; enemy champions and epic bosses are on the work board. On touch
+    screens, drag the joystick to move and tap an ability, then the map, to aim.
   </p>
 </div>
 <script src="src/sim.js"></script>
