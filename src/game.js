@@ -116,8 +116,24 @@
     lastBounceAt: -10,
   };
 
-  function heroAttackDamage() {
-    return hero.baseAd + hero.bonusAd + (hero.level - 1) * 4;
+  const enemyChampion = Object.assign({}, hero, {
+    name: "Rival Bloop",
+    team: "red",
+    x: RED_BASE.x - 60,
+    y: RED_BASE.y + 60,
+    cooldowns: Object.assign({}, hero.cooldowns),
+    bloblets: [],
+    grab: null,
+    chargeStart: null,
+    flight: null,
+    bounce: null,
+    path: LANES.mid.slice().reverse(),
+    waypoint: 1,
+    retreating: false,
+  });
+
+  function championAttackDamage(champion) {
+    return champion.baseAd + champion.bonusAd + (champion.level - 1) * 4;
   }
 
   // Camps pair Sim camp state with live monster units.
@@ -126,12 +142,14 @@
       def: def,
       sim: Sim.createCamp(def.stats.kind),
       monsters: [],
+      lastAttacker: null,
     };
   });
 
   function spawnCampMonsters(camp) {
     const stats = camp.def.stats;
     camp.monsters = [];
+    camp.lastAttacker = null;
     for (let i = 0; i < stats.monsters; i += 1) {
       const angle = (i / Math.max(1, stats.monsters)) * Math.PI * 2;
       const offset = stats.monsters === 1 ? 0 : 34;
@@ -235,6 +253,7 @@
   function damageUnit(unit, amount, attacker) {
     unit.hp -= amount;
     unit.lastAttacker = attacker;
+    if (unit.camp) unit.camp.lastAttacker = attacker;
     // Tower aggro bookkeeping: a champion who hurts an enemy champion
     // while both are under one of that champion's towers earns those
     // towers' attention (see Sim.selectTowerTarget).
@@ -250,16 +269,20 @@
     }
   }
 
-  function gainXp(amount) {
-    const before = hero.level;
-    hero.xp += amount;
-    hero.level = Sim.levelFromXp(hero.xp);
-    if (hero.level > before) {
-      hero.maxHp += 95 * (hero.level - before);
-      hero.maxMana += 35 * (hero.level - before);
-      hero.hp = Math.min(hero.maxHp, hero.hp + 120);
-      hero.mana = hero.maxMana;
+  function gainChampionXp(champion, amount) {
+    const before = champion.level;
+    champion.xp += amount;
+    champion.level = Sim.levelFromXp(champion.xp);
+    if (champion.level > before) {
+      champion.maxHp += 95 * (champion.level - before);
+      champion.maxMana += 35 * (champion.level - before);
+      champion.hp = Math.min(champion.maxHp, champion.hp + 120);
+      champion.mana = champion.maxMana;
     }
+  }
+
+  function gainXp(amount) {
+    gainChampionXp(hero, amount);
   }
 
   // ------------------------------------------------------------ minions
@@ -311,8 +334,7 @@
         best = t;
       }
     });
-    // The hero is a valid target for red minions, except while he is
-    // split into bloblets; then the bloblets are the targets.
+    // Champions and bloblets are valid targets for enemy minions.
     if (m.team === "red" && !hero.dead && !hero.split) {
       const d = dist(m, hero);
       if (d < bestD) {
@@ -329,6 +351,13 @@
           bestD = d;
         }
       });
+    }
+    if (m.team === "blue" && !enemyChampion.dead) {
+      const d = dist(m, enemyChampion);
+      if (d < bestD) {
+        best = enemyChampion;
+        bestD = d;
+      }
     }
     return { unit: best, distance: bestD };
   }
@@ -372,15 +401,15 @@
     // Deaths and rewards.
     state.minions = state.minions.filter(function (m) {
       if (m.hp > 0) return true;
-      if (!m.reachedEnd && m.team === "red") {
-        const byHero = m.lastAttacker === hero;
-        if (dist(m, hero) <= 1400 && !hero.dead) {
-          if (byHero) {
-            hero.gold += Sim.LAST_HIT_GOLD[m.kind];
+      if (!m.reachedEnd) {
+        const champion = m.team === "red" ? hero : enemyChampion;
+        if (dist(m, champion) <= 1400 && !champion.dead) {
+          if (m.lastAttacker === champion) {
+            champion.gold += Sim.LAST_HIT_GOLD[m.kind];
           } else {
-            hero.gold += Sim.SHARED_GOLD;
+            champion.gold += Sim.SHARED_GOLD;
           }
-          gainXp(Sim.splitXp(Sim.MINION_XP[m.kind], 1));
+          gainChampionXp(champion, Sim.splitXp(Sim.MINION_XP[m.kind], 1));
         }
       }
       return false;
@@ -401,17 +430,28 @@
           allDead = false;
           mon.attackCooldown -= dt;
           if (isGrabbed(mon)) return; // held by Stretch Grab
-          // The camp fights the hero, or his bloblets while he is split.
+          // Camp monsters attack the nearest champion or active bloblet.
           let target = null;
+          let targetD = Infinity;
           if (hero.split) {
             hero.bloblets.forEach(function (b) {
               if (b.hp <= 0) return;
-              if (dist(b, camp.def) < 340 && (!target || dist(b, camp.def) < dist(target, camp.def))) {
+              const d = dist(b, camp.def);
+              if (d < 340 && d < targetD) {
                 target = b;
+                targetD = d;
               }
             });
           } else if (!hero.dead && dist(hero, camp.def) < 340) {
             target = hero;
+            targetD = dist(hero, camp.def);
+          }
+          if (!enemyChampion.dead && dist(enemyChampion, camp.def) < Sim.CHAMPION_BOT.campRange) {
+            const d = dist(enemyChampion, camp.def);
+            if (d < targetD) {
+              target = enemyChampion;
+              targetD = d;
+            }
           }
           if (target) {
             if (dist(mon, target) <= mon.radius + target.radius + 26) {
@@ -420,7 +460,8 @@
                 if (target === hero) {
                   hero.hp -= Sim.mitigatePhysical(mon.damage, hero.armor);
                 } else {
-                  damageUnit(target, mon.damage, mon);
+                  const armor = target.armor === undefined ? 0 : target.armor;
+                  damageUnit(target, Sim.mitigatePhysical(mon.damage, armor), mon);
                 }
               }
             } else if (!isRooted(mon)) {
@@ -434,8 +475,13 @@
       });
       if (allDead) {
         Sim.clearCamp(camp.sim, state.time);
-        hero.gold += camp.def.stats.gold;
-        gainXp(camp.def.stats.xp);
+        if (camp.lastAttacker === enemyChampion) {
+          enemyChampion.gold += camp.def.stats.gold;
+          gainChampionXp(enemyChampion, camp.def.stats.xp);
+        } else {
+          hero.gold += camp.def.stats.gold;
+          gainXp(camp.def.stats.xp);
+        }
       }
     });
   }
@@ -460,6 +506,9 @@
       if (hero.team !== t.team && !hero.dead && !hero.split) {
         candidates.push({ ref: hero, kind: "champion", x: hero.x, y: hero.y, hp: hero.hp, radius: hero.radius, aggro: hero.towerAggro });
       }
+      if (enemyChampion.team !== t.team && !enemyChampion.dead) {
+        candidates.push({ ref: enemyChampion, kind: "champion", x: enemyChampion.x, y: enemyChampion.y, hp: enemyChampion.hp, radius: enemyChampion.radius, aggro: enemyChampion.towerAggro });
+      }
       const pick = Sim.selectTowerTarget(t, candidates, state.time);
       if (!pick) return;
       t.attackCooldown = Sim.TOWER.attackPeriod;
@@ -468,6 +517,152 @@
       damageUnit(target, Sim.towerShotDamage(armor), t);
       state.tracers.push({ x1: t.x, y1: t.y, x2: target.x, y2: target.y, life: 0.12, team: t.team });
     });
+  }
+
+  function updateEnemyChampion(dt) {
+    if (enemyChampion.dead) {
+      if (state.time >= enemyChampion.respawnAt) {
+        enemyChampion.dead = false;
+        enemyChampion.hp = enemyChampion.maxHp;
+        enemyChampion.mana = enemyChampion.maxMana;
+        enemyChampion.x = RED_BASE.x - 60;
+        enemyChampion.y = RED_BASE.y + 60;
+        enemyChampion.waypoint = 1;
+        enemyChampion.retreating = false;
+        enemyChampion.lastAttacker = null;
+      }
+      return;
+    }
+
+    if (enemyChampion.hp <= 0) {
+      enemyChampion.dead = true;
+      enemyChampion.deaths += 1;
+      enemyChampion.respawnAt =
+        state.time +
+        Sim.CHAMPION_BOT.respawnBaseSeconds +
+        Sim.CHAMPION_BOT.respawnPerLevelSeconds * enemyChampion.level;
+      if (enemyChampion.lastAttacker === hero) {
+        hero.kills += 1;
+        hero.gold += Sim.CHAMPION_BOT.killGold;
+        gainXp(Sim.CHAMPION_BOT.killXp);
+      }
+      return;
+    }
+
+    enemyChampion.retreating = Sim.shouldBotRetreat(
+      enemyChampion.retreating,
+      enemyChampion.hp,
+      enemyChampion.maxHp
+    );
+    enemyChampion.hp = Math.min(enemyChampion.maxHp, enemyChampion.hp + 3.5 * dt);
+    if (isGrabbed(enemyChampion) || isRooted(enemyChampion)) return;
+    if (enemyChampion.retreating) {
+      moveToward(enemyChampion, RED_BASE, enemyChampion.moveSpeed, dt);
+      if (dist(enemyChampion, RED_BASE) < 170) {
+        enemyChampion.hp = Math.min(
+          enemyChampion.maxHp,
+          enemyChampion.hp + enemyChampion.maxHp * 0.12 * dt
+        );
+      }
+      return;
+    }
+
+    enemyChampion.attackCooldown -= dt;
+    let target = null;
+    let targetD = Sim.CHAMPION_BOT.targetRange;
+    state.minions.forEach(function (m) {
+      if (m.team !== "blue" || m.hp <= 0) return;
+      const d = dist(enemyChampion, m);
+      if (d < targetD) {
+        target = m;
+        targetD = d;
+      }
+    });
+    if (hero.split) {
+      hero.bloblets.forEach(function (bloblet) {
+        if (bloblet.hp <= 0) return;
+        const d = dist(enemyChampion, bloblet);
+        if (d < targetD) {
+          target = bloblet;
+          targetD = d;
+        }
+      });
+    } else if (!hero.dead) {
+      const d = dist(enemyChampion, hero);
+      if (d < targetD) {
+        target = hero;
+        targetD = d;
+      }
+    }
+    if (target) {
+      if (targetD <= enemyChampion.attackRange + target.radius) {
+        if (enemyChampion.attackCooldown <= 0) {
+          enemyChampion.attackCooldown = enemyChampion.attackPeriod;
+          const armor = target.armor === undefined ? 10 : target.armor;
+          damageUnit(target, Sim.mitigatePhysical(championAttackDamage(enemyChampion), armor), enemyChampion);
+        }
+      } else {
+        moveToward(enemyChampion, target, enemyChampion.moveSpeed, dt);
+      }
+      return;
+    }
+
+    let towerTarget = null;
+    let towerTargetD = Sim.CHAMPION_BOT.targetRange;
+    state.towers.forEach(function (tower) {
+      if (tower.team !== "blue" || tower.hp <= 0) return;
+      const d = dist(enemyChampion, tower);
+      if (d < towerTargetD) {
+        towerTarget = tower;
+        towerTargetD = d;
+      }
+    });
+    if (towerTarget) {
+      if (towerTargetD <= enemyChampion.attackRange + towerTarget.radius) {
+        if (enemyChampion.attackCooldown <= 0) {
+          enemyChampion.attackCooldown = enemyChampion.attackPeriod;
+          damageUnit(
+            towerTarget,
+            Sim.mitigatePhysical(championAttackDamage(enemyChampion), towerTarget.armor),
+            enemyChampion
+          );
+        }
+      } else {
+        moveToward(enemyChampion, towerTarget, enemyChampion.moveSpeed, dt);
+      }
+      return;
+    }
+
+    let campTarget = null;
+    let campTargetD = Sim.CHAMPION_BOT.campRange;
+    state.camps.forEach(function (camp) {
+      if (camp.def.id.indexOf("red-") !== 0 || !camp.sim.alive) return;
+      camp.monsters.forEach(function (monster) {
+        if (monster.hp <= 0) return;
+        const d = dist(enemyChampion, monster);
+        if (d < campTargetD) {
+          campTarget = monster;
+          campTargetD = d;
+        }
+      });
+    });
+    if (campTarget) {
+      if (campTargetD <= enemyChampion.attackRange + campTarget.radius) {
+        if (enemyChampion.attackCooldown <= 0) {
+          enemyChampion.attackCooldown = enemyChampion.attackPeriod;
+          const armor = campTarget.armor === undefined ? 10 : campTarget.armor;
+          damageUnit(campTarget, Sim.mitigatePhysical(championAttackDamage(enemyChampion), armor), enemyChampion);
+        }
+      } else {
+        moveToward(enemyChampion, campTarget, enemyChampion.moveSpeed, dt);
+      }
+      return;
+    }
+
+    const waypoint = enemyChampion.path[enemyChampion.waypoint];
+    if (!waypoint) return;
+    moveToward(enemyChampion, waypoint, enemyChampion.moveSpeed, dt);
+    if (dist(enemyChampion, waypoint) < 14) enemyChampion.waypoint += 1;
   }
 
   // ------------------------------------------------------------ hero
@@ -680,6 +875,9 @@
     state.minions.forEach(function (m) {
       if (m.team === "red" && m.hp > 0 && dist(point, m) <= radius + m.radius) out.push(m);
     });
+    if (!enemyChampion.dead && dist(point, enemyChampion) <= radius + enemyChampion.radius) {
+      out.push(enemyChampion);
+    }
     state.camps.forEach(function (camp) {
       camp.monsters.forEach(function (mon) {
         if (mon.hp > 0 && dist(point, mon) <= radius + mon.radius) {
@@ -830,6 +1028,13 @@
         target = m;
       }
     });
+    if (!enemyChampion.dead) {
+      const d = dist(hero, enemyChampion);
+      if (d < targetD) {
+        targetD = d;
+        target = enemyChampion;
+      }
+    }
     state.camps.forEach(function (camp) {
       if (dist(hero, camp.def) > 360) return;
       camp.monsters.forEach(function (mon) {
@@ -852,7 +1057,7 @@
     if (target && targetD <= hero.attackRange + target.radius && hero.attackCooldown <= 0) {
       hero.attackCooldown = hero.attackPeriod;
       const armor = target.armor === undefined ? 10 : target.armor;
-      damageUnit(target, Sim.mitigatePhysical(heroAttackDamage(), armor), hero);
+      damageUnit(target, Sim.mitigatePhysical(championAttackDamage(hero), armor), hero);
     }
 
     if (hero.hp <= 0) {
@@ -1055,6 +1260,27 @@
       ctx.fill();
       drawBar(m.x, m.y - m.radius - 10, 30, m.hp / m.maxHp, m.team === "blue" ? "#3a7bd5" : "#d53a3a");
     });
+
+    if (!enemyChampion.dead) {
+      ctx.fillStyle = "#d94b4b";
+      ctx.beginPath();
+      ctx.arc(enemyChampion.x, enemyChampion.y, enemyChampion.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#7f2525";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      drawBar(
+        enemyChampion.x,
+        enemyChampion.y - enemyChampion.radius - 16,
+        56,
+        enemyChampion.hp / enemyChampion.maxHp,
+        "#d53a3a"
+      );
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "12px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(enemyChampion.name + "  Lv " + enemyChampion.level, enemyChampion.x, enemyChampion.y + enemyChampion.radius + 16);
+    }
 
     // Projectiles and ability rings.
     state.projectiles.forEach(function (p) {
@@ -1311,6 +1537,7 @@
     lastTs = ts;
     state.time += dt;
     updateHero(dt);
+    updateEnemyChampion(dt);
     updateMinions(dt);
     updateCamps(dt);
     updateTowers(dt);

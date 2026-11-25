@@ -373,6 +373,27 @@ const TOWER = {
 // How long (seconds) a tower remembers that a champion earned its aggro.
 const TOWER_AGGRO_WINDOW = 3;
 
+// Behavior tuning and rewards for the opposing champion bot.
+const CHAMPION_BOT = {
+  retreatHealthFraction: 0.3,
+  returnHealthFraction: 0.75,
+  targetRange: 360,
+  campRange: 340,
+  killGold: 150,
+  killXp: 200,
+  respawnBaseSeconds: 5,
+  respawnPerLevelSeconds: 0.5,
+};
+
+// Keep retreating until the bot has recovered enough to safely rejoin lane.
+function shouldBotRetreat(retreating, hp, maxHp) {
+  if (maxHp <= 0) return true;
+  const healthFraction = hp / maxHp;
+  return retreating
+    ? healthFraction < CHAMPION_BOT.returnHealthFraction
+    : healthFraction <= CHAMPION_BOT.retreatHealthFraction;
+}
+
 // Damage of one tower shot against a target with the given armor.
 function towerShotDamage(armor) {
   return mitigatePhysical(TOWER.damage, armor);
@@ -480,6 +501,8 @@ const Sim = {
   shouldRevive,
   TOWER,
   TOWER_AGGRO_WINDOW,
+  CHAMPION_BOT,
+  shouldBotRetreat,
   towerShotDamage,
   selectTowerTarget,
   reapDamage,

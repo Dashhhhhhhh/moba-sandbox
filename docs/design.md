@@ -100,6 +100,11 @@ is original to this project.
   damage towers with basic attacks only; abilities do not damage towers
   in the prototype. A destroyed tower stays on the map as rubble and no
   longer shoots.
+- The opposing mid-lane champion bot uses Bloop's base stats and basic
+  attacks. It engages enemies within 360 units and clears nearby red-side
+  camps within 340 units. It retreats at 30% health and returns to lane after
+  recovering to 75%. A champion takedown awards 150 gold and 200 XP; the bot
+  respawns after 5 s plus 0.5 s per champion level.
 
 ### Reap (the camp execute)
 
@@ -164,7 +169,8 @@ are GAME-009 on the coordination board.
 ## Sandbox scope
 
 - Single player controlling one champion, plus simple scripted bots:
-  allied and enemy minion waves, and camp monsters that fight back.
+  allied and enemy minion waves, one opposing champion, and camp monsters
+  that fight back.
 - No networking, no accounts, no items, no shop in the prototype.
 - Enemy champion bots are GAME-003. Lane towers shipped with GAME-001.
 
