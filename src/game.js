@@ -714,6 +714,18 @@
   }
 
   function updateHero(dt) {
+    // Personal timers run on the game clock in every state: ability
+    // cooldowns keep ticking and gel chunks keep expiring while Bloop
+    // is dead, split, or flying, just like the world timers (waves,
+    // camps, towers) already do.
+    Object.keys(hero.cooldowns).forEach(function (k) {
+      hero.cooldowns[k] = Math.max(0, hero.cooldowns[k] - dt);
+    });
+    hero.attackCooldown -= dt;
+    state.chunks = state.chunks.filter(function (c) {
+      return state.time < c.expiresAt;
+    });
+
     if (hero.dead) {
       if (state.time >= hero.respawnAt) {
         hero.dead = false;
@@ -757,7 +769,7 @@
     }
 
     // Loose Gel chunks: taking damage sheds a chunk now and then;
-    // walking over one heals. Chunks expire.
+    // walking over one heals. Expiry runs on the game clock above.
     if (hero.hp < hero.lastHp && hero.hp > 0 && state.time >= hero.chunkCd) {
       hero.chunkCd = state.time + Sim.PASSIVE.chunkDropCooldown;
       state.chunks.push({
@@ -767,7 +779,6 @@
       });
     }
     state.chunks = state.chunks.filter(function (c) {
-      if (state.time >= c.expiresAt) return false;
       if (dist(hero, c) <= hero.radius + 14) {
         hero.hp = Math.min(hero.maxHp, hero.hp + Sim.chunkHealAmount(hero.maxHp));
         return false;
@@ -812,12 +823,6 @@
     if (state.time >= Sim.AMBIENT_GOLD_START) {
       hero.gold += (Sim.AMBIENT_GOLD_AMOUNT / Sim.AMBIENT_GOLD_TICK) * dt;
     }
-
-    // Cooldowns.
-    Object.keys(hero.cooldowns).forEach(function (k) {
-      hero.cooldowns[k] = Math.max(0, hero.cooldowns[k] - dt);
-    });
-    hero.attackCooldown -= dt;
 
     // Boing Barrage bounces tick on their own timer.
     if (hero.bounce && state.time >= hero.bounce.nextAt) doBounce();

@@ -237,6 +237,33 @@ test("death clears the move target, so respawn does not walk it back", function 
   assert.ok(moved < 1, "hero walked " + moved + " units after respawn");
 });
 
+test("cooldowns and chunk expiry keep ticking while dead", function () {
+  const T = loadGame();
+  parkHero(T, 750, 750);
+  T.hero.passiveReadyAt = Infinity;
+  T.hero.cooldowns.oozeBurst = 8;
+  T.state.chunks.push({ x: 100, y: 100, expiresAt: T.state.time + 2 });
+  T.hero.hp = -5;
+  step(T, 0.05); // dies on this frame
+  assert.equal(T.hero.dead, true);
+  step(T, 3);
+  assert.ok(Math.abs(T.hero.cooldowns.oozeBurst - 4.95) < 0.01, "cooldown " + T.hero.cooldowns.oozeBurst);
+  assert.equal(T.state.chunks.length, 0); // expired on schedule, not frozen
+});
+
+test("cooldowns keep ticking during elastic launch flight", function () {
+  const T = loadGame();
+  parkHero(T, 750, 750);
+  T.hero.cooldowns.oozeBurst = 8;
+  T.state.mouse.x = 1050;
+  T.state.mouse.y = 750;
+  T.startCharge();
+  T.releaseLaunch();
+  step(T, 0.3); // mid-flight
+  assert.notEqual(T.hero.flight, null);
+  assert.ok(Math.abs(T.hero.cooldowns.oozeBurst - 7.7) < 0.01, "cooldown " + T.hero.cooldowns.oozeBurst);
+});
+
 test("boing barrage casts normally at level 6", function () {
   const T = loadGame();
   parkHero(T, 750, 750);
