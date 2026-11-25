@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shatterlane - MOBA Sandbox Prototype</title>
+<style>
+  body { margin: 0; background: #14231a; color: #e8e3d0; font-family: sans-serif; }
+  #wrap { max-width: 900px; margin: 0 auto; padding: 12px; }
+  h1 { font-size: 20px; margin: 4px 0 8px; }
+  canvas { width: 100%; background: #2e5d33; border: 2px solid #0d1a10; display: block; }
+  .bar { height: 12px; background: rgba(0,0,0,0.5); margin: 4px 0; position: relative; }
+  .bar > div { height: 100%; }
+  #hud-hp { background: #3fae4a; }
+  #hud-mana { background: #3a7bd5; }
+  #hud-xp { background: #9b59b6; height: 6px; }
+  #hud-top { display: flex; gap: 18px; font-weight: bold; margin: 6px 0; }
+  #hud-abilities { font-size: 13px; margin-top: 6px; }
+  p.help { font-size: 13px; color: #b9bfae; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Shatterlane - sandbox prototype</h1>
+  <canvas id="game" width="900" height="900"></canvas>
+  <div id="hud-top">
+    <span id="hud-level">Level 1</span>
+    <span id="hud-gold">Gold 0</span>
+    <span id="hud-time">0:00</span>
+  </div>
+  <div class="bar"><div id="hud-hp" style="width:100%"></div></div>
+  <div class="bar"><div id="hud-mana" style="width:100%"></div></div>
+  <div class="bar" id="hud-xpbar"><div id="hud-xp" style="width:0%"></div></div>
+  <div id="hud-abilities"></div>
+  <p class="help">
+    Move: arrow keys or right-click. Aim with the mouse. Abilities: Q Briar Lash,
+    W Root Snare, E Thorn Dash, R Verdant Cataclysm. F is Reap, the camp
+    execute. Your champion auto-attacks the nearest enemy in range. Clear
+    jungle camps, last-hit red minions, and level up. Structures, enemy
+    champions, and epic bosses are on the work board.
+  </p>
+</div>
+<script src="src/sim.js"></script>
+<script src="src/game.js"></script>
+</body>
+</html>
