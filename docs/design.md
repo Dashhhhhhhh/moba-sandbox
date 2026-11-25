@@ -72,6 +72,21 @@ is original to this project.
   (all three lanes are future work). A wave is 3 melee + 3 caster minions,
   plus a siege minion every third wave.
 
+### Towers
+
+- One tower per lane per side, placed 35% of the lane's length from its
+  own base (six towers total). Stats: 2500 HP, 30 armor, shot damage
+  160 (physical, mitigated by the target's armor), range 260, one shot
+  every 1.2 s.
+- Targeting, in order: (1) an enemy champion who damaged an allied
+  champion while both were in this tower's range keeps the tower's
+  attention for 3 s; (2) the nearest enemy minion in range; (3) the
+  nearest enemy champion in range.
+- Minions treat towers as targets and stop to attack them. Champions
+  damage towers with basic attacks only; abilities do not damage towers
+  in the prototype. A destroyed tower stays on the map as rubble and no
+  longer shoots.
+
 ### Reap (the camp execute)
 
 - Every champion has Reap on the F key: a camp-monster execute.
@@ -119,17 +134,18 @@ slingshotting himself into fights. Base stats in the prototype: 680 HP,
 
 ## Win condition
 
-Destroy the enemy Heartspire. In the current sandbox prototype there are no
-structures yet, so there is no win or loss; the prototype is for practicing
-movement, last-hitting, and camp clears. Structures are GAME-001 and
-GAME-009 on the coordination board.
+Destroy the enemy Heartspire. In the current sandbox prototype the lane
+towers exist (GAME-001, done) but Heartspires do not, so there is still no
+win or loss; the prototype is for practicing movement, last-hitting, camp
+clears, and pushing lanes into towers. Heartspires and the win condition
+are GAME-009 on the coordination board.
 
 ## Sandbox scope
 
 - Single player controlling one champion, plus simple scripted bots:
   allied and enemy minion waves, and camp monsters that fight back.
 - No networking, no accounts, no items, no shop in the prototype.
-- Enemy champion bots are GAME-003. Towers are GAME-001.
+- Enemy champion bots are GAME-003. Lane towers shipped with GAME-001.
 
 ## Tech constraints
 

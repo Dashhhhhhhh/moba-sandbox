@@ -7,7 +7,7 @@ Reap. Genre mechanics, original everything: every name, champion, ability,
 and line of text in this repository was invented for this project.
 
 **Status:** playable sandbox prototype. One champion, minion waves on mid
-lane, clearable jungle camps, gold, XP, and levels. No structures, items,
+lane, clearable jungle camps, lane towers, gold, XP, and levels. No items
 or enemy champions yet; those are on the work board.
 
 ## Play the prototype

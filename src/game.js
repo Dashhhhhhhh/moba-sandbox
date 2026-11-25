@@ -58,6 +58,8 @@
     minions: [],
     projectiles: [],
     chunks: [],
+    towers: [],
+    tracers: [],
     camps: [],
     keys: {},
     mouse: { x: 750, y: 750 },
@@ -67,6 +69,9 @@
 
   const hero = {
     name: "Bloop",
+    team: "blue",
+    isChampion: true,
+    towerAggro: null, // { towerId, at } set when he earns a tower's attention
     x: BLUE_BASE.x + 60,
     y: BLUE_BASE.y - 60,
     radius: 20,
@@ -144,6 +149,52 @@
   }
   state.camps.forEach(spawnCampMonsters);
 
+  // One tower per lane per side, placed 35 percent of the lane's length
+  // from its own base. Stats live in Sim.TOWER.
+  function lanePoint(path, frac) {
+    let total = 0;
+    const segs = [];
+    for (let i = 1; i < path.length; i += 1) {
+      const len = dist(path[i - 1], path[i]);
+      segs.push(len);
+      total += len;
+    }
+    let want = total * frac;
+    for (let i = 0; i < segs.length; i += 1) {
+      if (want <= segs[i]) {
+        const a = path[i];
+        const b = path[i + 1];
+        const t = segs[i] === 0 ? 0 : want / segs[i];
+        return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+      }
+      want -= segs[i];
+    }
+    const last = path[path.length - 1];
+    return { x: last.x, y: last.y };
+  }
+
+  function makeTower(team, lane, pos) {
+    return {
+      id: team + "-" + lane,
+      team: team,
+      lane: lane,
+      x: pos.x,
+      y: pos.y,
+      radius: Sim.TOWER.radius,
+      maxHp: Sim.TOWER.maxHp,
+      hp: Sim.TOWER.maxHp,
+      armor: Sim.TOWER.armor,
+      attackCooldown: 0,
+      rootUntil: 0,
+      lastAttacker: null,
+    };
+  }
+
+  Object.keys(LANES).forEach(function (lane) {
+    state.towers.push(makeTower("blue", lane, lanePoint(LANES[lane], 0.35)));
+    state.towers.push(makeTower("red", lane, lanePoint(LANES[lane], 0.65)));
+  });
+
   // ------------------------------------------------------------ helpers
 
   function dist(a, b) {
@@ -179,6 +230,19 @@
   function damageUnit(unit, amount, attacker) {
     unit.hp -= amount;
     unit.lastAttacker = attacker;
+    // Tower aggro bookkeeping: a champion who hurts an enemy champion
+    // while both are under one of that champion's towers earns those
+    // towers' attention (see Sim.selectTowerTarget).
+    if (attacker && attacker.isChampion && unit.isChampion && attacker !== unit) {
+      state.towers.forEach(function (t) {
+        if (t.team !== unit.team || t.hp <= 0) return;
+        const nearAttacker = dist(attacker, t) <= Sim.TOWER.range + attacker.radius;
+        const nearVictim = dist(unit, t) <= Sim.TOWER.range + unit.radius;
+        if (nearAttacker && nearVictim) {
+          attacker.towerAggro = { towerId: t.id, at: state.time };
+        }
+      });
+    }
   }
 
   function gainXp(amount) {
@@ -239,6 +303,16 @@
       if (d < bestD) {
         bestD = d;
         best = other;
+      }
+    });
+    // Enemy towers are valid targets too: a wave marches until it can
+    // chew on one.
+    state.towers.forEach(function (t) {
+      if (t.team === m.team || t.hp <= 0) return;
+      const d = dist(m, t);
+      if (d < bestD) {
+        bestD = d;
+        best = t;
       }
     });
     // The hero is a valid target for red minions, except while he is
@@ -367,6 +441,36 @@
         hero.gold += camp.def.gold;
         gainXp(camp.def.xp);
       }
+    });
+  }
+
+  // ------------------------------------------------------------ towers
+
+  function updateTowers(dt) {
+    state.tracers = state.tracers.filter(function (tr) {
+      tr.life -= dt;
+      return tr.life > 0;
+    });
+    state.towers.forEach(function (t) {
+      if (t.hp <= 0) return;
+      t.attackCooldown -= dt;
+      if (t.attackCooldown > 0) return;
+      const candidates = [];
+      state.minions.forEach(function (m) {
+        if (m.team !== t.team && m.hp > 0) {
+          candidates.push({ ref: m, kind: "minion", x: m.x, y: m.y, hp: m.hp, radius: m.radius, aggro: null });
+        }
+      });
+      if (hero.team !== t.team && !hero.dead && !hero.split) {
+        candidates.push({ ref: hero, kind: "champion", x: hero.x, y: hero.y, hp: hero.hp, radius: hero.radius, aggro: hero.towerAggro });
+      }
+      const pick = Sim.selectTowerTarget(t, candidates, state.time);
+      if (!pick) return;
+      t.attackCooldown = Sim.TOWER.attackPeriod;
+      const target = pick.ref;
+      const armor = target.armor === undefined ? 0 : target.armor;
+      damageUnit(target, Sim.towerShotDamage(armor), t);
+      state.tracers.push({ x1: t.x, y1: t.y, x2: target.x, y2: target.y, life: 0.12, team: t.team });
     });
   }
 
@@ -741,6 +845,14 @@
         }
       });
     });
+    state.towers.forEach(function (t) {
+      if (t.team === hero.team || t.hp <= 0) return;
+      const d = dist(hero, t);
+      if (d < targetD) {
+        targetD = d;
+        target = t;
+      }
+    });
     if (target && targetD <= hero.attackRange + target.radius && hero.attackCooldown <= 0) {
       hero.attackCooldown = hero.attackPeriod;
       const armor = target.armor === undefined ? 10 : target.armor;
@@ -902,6 +1014,40 @@
         ctx.fill();
         drawBar(mon.x, mon.y - mon.radius - 12, 44, mon.hp / mon.maxHp, "#c0392b");
       });
+    });
+
+    // Towers (destroyed ones stay as rubble).
+    state.towers.forEach(function (t) {
+      if (t.hp <= 0) {
+        ctx.fillStyle = "#5a5348";
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, t.radius, 0, Math.PI * 2);
+        ctx.fill();
+        return;
+      }
+      ctx.fillStyle = "#8d8578";
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, t.radius + 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = t.team === "blue" ? "#3a7bd5" : "#d53a3a";
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, t.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 11px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Tower", t.x, t.y + 4);
+      drawBar(t.x, t.y - t.radius - 14, 52, t.hp / t.maxHp, t.team === "blue" ? "#3a7bd5" : "#d53a3a");
+    });
+
+    // Tower shot tracers.
+    state.tracers.forEach(function (tr) {
+      ctx.strokeStyle = tr.team === "blue" ? "rgba(120,180,255,0.9)" : "rgba(255,120,120,0.9)";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(tr.x1, tr.y1);
+      ctx.lineTo(tr.x2, tr.y2);
+      ctx.stroke();
     });
 
     // Minions.
@@ -1171,6 +1317,7 @@
     updateHero(dt);
     updateMinions(dt);
     updateCamps(dt);
+    updateTowers(dt);
     updateProjectiles(dt);
     draw();
     updateHud();

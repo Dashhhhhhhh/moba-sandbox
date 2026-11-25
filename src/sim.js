@@ -265,6 +265,77 @@ function shouldRevive(survivingBloblets, elapsedSeconds) {
   return survivingBloblets > 0 && elapsedSeconds >= PASSIVE.blobletReviveSeconds;
 }
 
+// ---------------------------------------------------------------- towers
+
+// Lane tower stats, identical for both teams. Positions live in game.js.
+const TOWER = {
+  maxHp: 2500,
+  damage: 160,
+  range: 260,
+  attackPeriod: 1.2, // seconds between shots
+  radius: 26,
+  armor: 30,
+};
+
+// How long (seconds) a tower remembers that a champion earned its aggro.
+const TOWER_AGGRO_WINDOW = 3;
+
+// Damage of one tower shot against a target with the given armor.
+function towerShotDamage(armor) {
+  return mitigatePhysical(TOWER.damage, armor);
+}
+
+// Picks a tower's next target. `tower` is { id, x, y }. Each candidate
+// is { kind: "minion" | "champion", x, y, hp, radius, aggro } where
+// aggro is null or { towerId, at } recording when this champion last
+// damaged an allied champion under that tower. Priority:
+//   1. A champion whose aggro on THIS tower is still fresh (newest
+//      aggro wins if several qualify).
+//   2. The nearest enemy minion in range.
+//   3. The nearest enemy champion in range.
+// Out-of-range and dead candidates are ignored. Returns the candidate
+// object itself, or null when nothing can be shot.
+function selectTowerTarget(tower, candidates, now) {
+  const inRange = candidates.filter(function (c) {
+    if (c.hp <= 0) return false;
+    const dx = c.x - tower.x;
+    const dy = c.y - tower.y;
+    return Math.sqrt(dx * dx + dy * dy) <= TOWER.range + (c.radius || 0);
+  });
+  let bestAggro = null;
+  inRange.forEach(function (c) {
+    if (c.kind !== "champion" || !c.aggro) return;
+    if (c.aggro.towerId !== tower.id) return;
+    if (now - c.aggro.at > TOWER_AGGRO_WINDOW) return;
+    if (!bestAggro || c.aggro.at > bestAggro.aggro.at) bestAggro = c;
+  });
+  if (bestAggro) return bestAggro;
+  let best = null;
+  let bestD = Infinity;
+  inRange.forEach(function (c) {
+    if (c.kind !== "minion") return;
+    const dx = c.x - tower.x;
+    const dy = c.y - tower.y;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d < bestD) {
+      bestD = d;
+      best = c;
+    }
+  });
+  if (best) return best;
+  inRange.forEach(function (c) {
+    if (c.kind !== "champion") return;
+    const dx = c.x - tower.x;
+    const dy = c.y - tower.y;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d < bestD) {
+      bestD = d;
+      best = c;
+    }
+  });
+  return best;
+}
+
 // ------------------------------------------------------- Reap (camp execute)
 
 // Reap is the camp execute available to every champion. It deals flat true
@@ -309,6 +380,10 @@ const Sim = {
   chunkHealAmount,
   blobletReviveHp,
   shouldRevive,
+  TOWER,
+  TOWER_AGGRO_WINDOW,
+  towerShotDamage,
+  selectTowerTarget,
   reapDamage,
   reapExecutes,
 };
