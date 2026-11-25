@@ -277,6 +277,8 @@
           radius: s.radius,
           maxHp: s.hp,
           hp: s.hp,
+          armor: s.armor,
+          magicResist: s.magicResist,
           damage: s.damage,
           range: s.range,
           speed: s.speed,
