@@ -170,8 +170,11 @@ function createCamp(kind) {
 }
 
 // Marks a camp cleared at time `now` and schedules its respawn.
-// Returns the camp for chaining.
+// Returns the camp for chaining. Clearing an already cleared camp is a
+// no-op: the respawn timer runs from the first clear, and a double
+// clear must not silently extend it.
 function clearCamp(camp, now) {
+  if (!camp.alive) return camp;
   camp.alive = false;
   camp.clearedAt = now;
   camp.respawnAt = now + CAMP_RESPAWN[camp.kind];
