@@ -378,6 +378,59 @@ function towerShotDamage(armor) {
   return mitigatePhysical(TOWER.damage, armor);
 }
 
+// Lane structures beyond the towers. A Wardstone is only vulnerable after
+// its lane tower falls; any fallen Wardstone exposes its team's Heartspire.
+const WARDSTONE = {
+  maxHp: 2200,
+  armor: 30,
+  radius: 28,
+};
+
+const HEARTSPIRE = {
+  maxHp: 5000,
+  armor: 40,
+  radius: 42,
+};
+
+function createStructure(kind, team, lane) {
+  const stats = kind === "wardstone" ? WARDSTONE : kind === "heartspire" ? HEARTSPIRE : null;
+  if (!stats) throw new Error("unknown structure: " + kind);
+  return {
+    kind: kind,
+    team: team,
+    lane: lane || null,
+    maxHp: stats.maxHp,
+    hp: stats.maxHp,
+    armor: stats.armor,
+    radius: stats.radius,
+  };
+}
+
+// Structure attacks are physical and mitigated by the target's armor.
+function damageStructure(structure, rawDamage) {
+  const damage = Math.max(0, mitigatePhysical(rawDamage, structure.armor));
+  structure.hp = Math.max(0, structure.hp - damage);
+  return structure.hp === 0;
+}
+
+// A Wardstone follows its lane's tower; any destroyed Wardstone exposes the
+// team's Heartspire.
+function isStructureVulnerable(structure, towers, wardstones) {
+  if (structure.kind === "wardstone") {
+    return towers.some(function (tower) {
+      return tower.team === structure.team &&
+        tower.lane === structure.lane &&
+        tower.hp <= 0;
+    });
+  }
+  if (structure.kind === "heartspire") {
+    return wardstones.some(function (wardstone) {
+      return wardstone.team === structure.team && wardstone.hp <= 0;
+    });
+  }
+  return false;
+}
+
 // Picks a tower's next target. `tower` is { id, x, y }. Each candidate
 // is { kind: "minion" | "champion", x, y, hp, radius, aggro } where
 // aggro is null or { towerId, at } recording when this champion last
@@ -481,6 +534,11 @@ const Sim = {
   TOWER,
   TOWER_AGGRO_WINDOW,
   towerShotDamage,
+  WARDSTONE,
+  HEARTSPIRE,
+  createStructure,
+  damageStructure,
+  isStructureVulnerable,
   selectTowerTarget,
   reapDamage,
   reapExecutes,
