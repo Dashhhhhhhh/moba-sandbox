@@ -15,7 +15,9 @@ make the tests pass, and never import anyone else's intellectual property.
 2. **Claim before you start.** All work is claimed in the coordination
    issue titled "Coordinating who works on what". Comment `claiming: <ID>`
    there before writing code, and put the ID in your pull request. If the
-   work is not listed yet, post it as a `finding:` first (see
+   work is not listed yet, post a `finding:` line and then, in the same
+   comment, `claiming: <short description>`; that claim is valid
+   immediately and a maintainer assigns the stable ID afterwards (see
    CONTRIBUTING.md). Unclaimed work may be closed without review.
 3. **One topic per pull request.** One work item ID per pull request. Do
    not bundle unrelated fixes, refactors, or balance changes together.

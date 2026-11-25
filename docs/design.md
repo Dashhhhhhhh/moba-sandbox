@@ -79,18 +79,43 @@ is original to this project.
   camp monsters, range 320, cooldown 15 s (sandbox tuning so players can
   practice the timing often).
 
-### Launch champion: Korrin, the Briar Knight
+### Launch champion: Bloop, the Bounceback Blob
 
-- Q, Briar Lash: line skillshot, physical damage 70 to 210 by rank plus
-  0.7 bonus attack damage. Cooldown 7 s, mana 50.
-- W, Root Snare: targeted area, magic damage 60 to 200 by rank plus 0.6
-  ability power, roots hit enemies for 1.0 to 1.6 s by rank. Cooldown 12 s,
-  mana 70.
-- E, Thorn Dash: dash up to 425 units toward the cursor, physical damage
-  40 to 140 by rank plus 0.5 bonus attack damage to enemies at the landing
-  point. Cooldown 10 s, mana 40.
-- R, Verdant Cataclysm: large area around Korrin, magic damage 200 to 400
-  by rank plus 0.9 ability power. Cooldown 90 s, mana 100.
+An original green slime champion: a bouncy tank who engages by
+slingshotting himself into fights. Base stats in the prototype: 680 HP,
+300 mana, 62 attack damage, 32 armor, 32 magic resist, 150 attack range.
+
+- Passive, Loose Gel: when Bloop takes damage, a chunk of gel drops off
+  (at most one every 4 s, chunks last 25 s). Walking over a chunk heals
+  him for 6% of his max HP. On lethal damage, instead of dying he splits
+  into 4 bloblets, each with 12% of his max HP, which crawl toward each
+  other for 6 s while enemies can hunt them. If at least one bloblet is
+  alive when the 6 s end, Bloop revives at their meeting point with 10%
+  of max HP plus 5% per surviving bloblet (30% if all four make it). If
+  every bloblet dies, Bloop dies for real. Passive cooldown 90 s,
+  counted from the split.
+- Q, Stretch Grab: two-part cast. First cast stretches an arm up to 550
+  units toward the cursor and grabs the first enemy it touches; a
+  grabbed enemy cannot move or attack. Recast within 4 s drags the
+  grabbed enemies to the cursor point and slams them together for magic
+  damage 60 to 200 by rank plus 0.6 ability power. The grab itself deals
+  no damage. Cooldown 11 s from the first cast, mana 55.
+- W, Ooze Burst: Bloop detonates his own ooze in a burst of radius 230
+  around him. Magic damage 50 to 150 by rank plus 0.3 ability power,
+  plus 5% to 9% of each enemy's max HP by rank (the max-health part is
+  mitigated like the rest). Cooldown 10 s, mana 60.
+- E, Elastic Launch: hold E to charge (Bloop cannot move while
+  charging), release to slingshot toward the cursor. Launch distance
+  scales with charge time: 300 units uncharged up to 800 units at the
+  full 1.2 s charge. On landing, enemies within 200 units take magic
+  damage 60 to 180 by rank plus 0.5 ability power and are knocked up
+  for 1.0 s. Cooldown 14 s, mana 60.
+- R, Boing Barrage: Bloop bounces 4 times, one bounce every 0.75 s,
+  hopping up to 180 units toward the cursor with each bounce. Each
+  landing deals magic damage 120 to 220 by rank plus 0.4 ability power
+  to enemies within 240 units and slows them by 30% for 1.0 s. The
+  first bounce that hits a given enemy also knocks it back 120 units.
+  Cooldown 100 s, mana 100.
 
 ## Win condition
 

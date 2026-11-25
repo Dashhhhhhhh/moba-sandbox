@@ -57,6 +57,7 @@
     waveCount: 0,
     minions: [],
     projectiles: [],
+    chunks: [],
     camps: [],
     keys: {},
     mouse: { x: 750, y: 750 },
@@ -65,23 +66,23 @@
   };
 
   const hero = {
-    name: "Korrin",
+    name: "Bloop",
     x: BLUE_BASE.x + 60,
     y: BLUE_BASE.y - 60,
     radius: 20,
-    maxHp: 620,
-    hp: 620,
-    maxMana: 320,
-    mana: 320,
-    baseAd: 64,
+    maxHp: 680,
+    hp: 680,
+    maxMana: 300,
+    mana: 300,
+    baseAd: 62,
     bonusAd: 0,
     ap: 0,
-    armor: 28,
-    magicResist: 30,
+    armor: 32,
+    magicResist: 32,
     moveSpeed: 335,
-    attackRange: 185,
+    attackRange: 150,
     attackCooldown: 0,
-    attackPeriod: 0.85,
+    attackPeriod: 0.9,
     xp: 0,
     level: 1,
     gold: 475,
@@ -90,7 +91,20 @@
     dead: false,
     respawnAt: 0,
     rootUntil: 0,
-    cooldowns: { briarLash: 0, rootSnare: 0, thornDash: 0, verdantCataclysm: 0, reap: 0 },
+    cooldowns: { stretchGrab: 0, oozeBurst: 0, elasticLaunch: 0, boingBarrage: 0, reap: 0 },
+    // Loose Gel passive state.
+    lastHp: 680,
+    chunkCd: 0,
+    passiveReadyAt: 0,
+    split: false,
+    splitAt: 0,
+    bloblets: [],
+    // Ability-in-progress state.
+    grab: null, // { targets: [unit], expiresAt, rank }
+    chargeStart: null,
+    flight: null, // { fromX, fromY, toX, toY, start, duration, rank }
+    bounce: null, // { remaining, nextAt, rank, hit: Set }
+    lastBounceAt: -10,
   };
 
   function heroAttackDamage() {
@@ -146,8 +160,20 @@
     unit.y += ((target.y - unit.y) / d) * step;
   }
 
+  // Rooted and knocked-up units cannot move or attack.
   function isRooted(unit) {
-    return state.time < unit.rootUntil;
+    return state.time < unit.rootUntil || state.time < (unit.airborneUntil || 0);
+  }
+
+  // Movement speed multiplier after slows (1 when not slowed).
+  function speedFactor(unit) {
+    if (state.time < (unit.slowUntil || 0)) return 1 - (unit.slowFraction || 0);
+    return 1;
+  }
+
+  // True while Bloop's Stretch Grab is holding this unit.
+  function isGrabbed(unit) {
+    return !!hero.grab && hero.grab.targets.indexOf(unit) !== -1;
   }
 
   function damageUnit(unit, amount, attacker) {
@@ -215,13 +241,24 @@
         best = other;
       }
     });
-    // The hero is a valid target for red minions.
-    if (m.team === "red" && !hero.dead) {
+    // The hero is a valid target for red minions, except while he is
+    // split into bloblets; then the bloblets are the targets.
+    if (m.team === "red" && !hero.dead && !hero.split) {
       const d = dist(m, hero);
       if (d < bestD) {
         best = hero;
         bestD = d;
       }
+    }
+    if (m.team === "red" && hero.split) {
+      hero.bloblets.forEach(function (b) {
+        if (b.hp <= 0) return;
+        const d = dist(m, b);
+        if (d < bestD) {
+          best = b;
+          bestD = d;
+        }
+      });
     }
     return { unit: best, distance: bestD };
   }
@@ -235,6 +272,7 @@
     state.minions.forEach(function (m) {
       if (m.hp <= 0) return;
       m.attackCooldown -= dt;
+      if (isGrabbed(m)) return; // held by Stretch Grab: no moving or attacking
       const found = nearestEnemyMinion(m);
       if (found.unit && found.distance <= m.range + found.unit.radius) {
         if (m.attackCooldown <= 0) {
@@ -244,12 +282,12 @@
         return;
       }
       if (found.unit && found.distance <= 300) {
-        if (!isRooted(m)) moveToward(m, found.unit, m.speed, dt);
+        if (!isRooted(m)) moveToward(m, found.unit, m.speed * speedFactor(m), dt);
         return;
       }
       const wp = m.path[m.waypoint];
       if (!wp) return;
-      if (!isRooted(m)) moveToward(m, wp, m.speed, dt);
+      if (!isRooted(m)) moveToward(m, wp, m.speed * speedFactor(m), dt);
       if (dist(m, wp) < 14) {
         m.waypoint += 1;
         if (m.waypoint >= m.path.length) {
@@ -292,19 +330,34 @@
         if (mon.hp > 0) {
           allDead = false;
           mon.attackCooldown -= dt;
-          const engaged = dist(hero, camp.def) < 340 && !hero.dead;
-          if (engaged) {
-            if (dist(mon, hero) <= mon.radius + hero.radius + 26) {
+          if (isGrabbed(mon)) return; // held by Stretch Grab
+          // The camp fights the hero, or his bloblets while he is split.
+          let target = null;
+          if (hero.split) {
+            hero.bloblets.forEach(function (b) {
+              if (b.hp <= 0) return;
+              if (dist(b, camp.def) < 340 && (!target || dist(b, camp.def) < dist(target, camp.def))) {
+                target = b;
+              }
+            });
+          } else if (!hero.dead && dist(hero, camp.def) < 340) {
+            target = hero;
+          }
+          if (target) {
+            if (dist(mon, target) <= mon.radius + target.radius + 26) {
               if (mon.attackCooldown <= 0) {
                 mon.attackCooldown = 1.2;
-                const dealt = Sim.mitigatePhysical(mon.damage, hero.armor);
-                hero.hp -= dealt;
+                if (target === hero) {
+                  hero.hp -= Sim.mitigatePhysical(mon.damage, hero.armor);
+                } else {
+                  damageUnit(target, mon.damage, mon);
+                }
               }
             } else if (!isRooted(mon)) {
-              moveToward(mon, hero, 165, dt);
+              moveToward(mon, target, 165 * speedFactor(mon), dt);
             }
           } else if (dist(mon, { x: mon.homeX, y: mon.homeY }) > 4 && !isRooted(mon)) {
-            moveToward(mon, { x: mon.homeX, y: mon.homeY }, 120, dt);
+            moveToward(mon, { x: mon.homeX, y: mon.homeY }, 120 * speedFactor(mon), dt);
             mon.hp = Math.min(mon.maxHp, mon.hp + mon.maxHp * 0.08 * dt);
           }
         }
@@ -319,53 +372,187 @@
 
   // ------------------------------------------------------------ hero
 
+  // Sandbox rank rule: basic abilities gain a rank every other level,
+  // the ultimate at levels 6, 12, and 18.
+  function abilityRank(key) {
+    if (key === "boingBarrage") return Math.max(1, Math.floor(hero.level / 6));
+    return Math.min(5, Math.ceil(hero.level / 2));
+  }
+
   function castAbility(key) {
-    if (hero.dead) return;
+    if (hero.dead || hero.split || hero.flight) return;
+    // Stretch Grab recast: while a grab is held, Q slams instead of
+    // firing a new arm. The cooldown already runs from the first cast.
+    if (key === "stretchGrab" && hero.grab) {
+      slamGrab();
+      return;
+    }
     const def = Sim.ABILITIES[key];
     if (hero.cooldowns[key] > 0 || hero.mana < def.manaCost) return;
     hero.mana -= def.manaCost;
     hero.cooldowns[key] = def.cooldown;
-    const rank = key === "verdantCataclysm" ? Math.max(1, Math.floor(hero.level / 6)) : Math.min(5, Math.ceil(hero.level / 2));
+    const rank = abilityRank(key);
     const aim = { x: state.mouse.x, y: state.mouse.y };
 
-    if (key === "briarLash") {
+    if (key === "stretchGrab") {
+      // First cast: the arm stretches toward the cursor and grabs the
+      // first enemy it touches. No damage until the slam.
       const d = Math.max(1, dist(hero, aim));
       state.projectiles.push({
         x: hero.x,
         y: hero.y,
-        vx: ((aim.x - hero.x) / d) * 720,
-        vy: ((aim.y - hero.y) / d) * 720,
-        radius: 9,
-        life: 0.75,
-        damage: Sim.abilityDamage(key, rank, hero.bonusAd, hero.ap, { armor: 0, magicResist: 0 }),
-        damageKey: key,
+        vx: ((aim.x - hero.x) / d) * 900,
+        vy: ((aim.y - hero.y) / d) * 900,
+        radius: 10,
+        life: def.grabRange / 900,
+        grabArm: true,
         rank: rank,
       });
-    } else if (key === "rootSnare") {
-      const radius = 165;
-      enemiesInRadius(aim, radius).forEach(function (u) {
-        damageUnit(u, Sim.abilityDamage(key, rank, hero.bonusAd, hero.ap, u), hero);
-        u.rootUntil = state.time + def.rootSeconds[rank - 1];
-      });
-      state.projectiles.push({ x: aim.x, y: aim.y, vx: 0, vy: 0, radius: radius, life: 0.25, ringOnly: true });
-    } else if (key === "thornDash") {
-      const d = Math.max(1, dist(hero, aim));
-      const range = Math.min(def.dashRange, d);
-      hero.x += ((aim.x - hero.x) / d) * range;
-      hero.y += ((aim.y - hero.y) / d) * range;
-      enemiesInRadius(hero, 130).forEach(function (u) {
+    } else if (key === "oozeBurst") {
+      enemiesInRadius(hero, def.radius).forEach(function (u) {
         damageUnit(u, Sim.abilityDamage(key, rank, hero.bonusAd, hero.ap, u), hero);
       });
-    } else if (key === "verdantCataclysm") {
-      enemiesInRadius(hero, 330).forEach(function (u) {
-        damageUnit(u, Sim.abilityDamage(key, rank, hero.bonusAd, hero.ap, u), hero);
+      state.projectiles.push({ x: hero.x, y: hero.y, vx: 0, vy: 0, radius: def.radius, life: 0.3, ringOnly: true });
+    } else if (key === "boingBarrage") {
+      hero.bounce = { remaining: def.bounces, nextAt: state.time, rank: rank, hit: new Set() };
+    }
+    // elasticLaunch is hold-and-release; see startCharge/releaseLaunch.
+  }
+
+  // Stretch Grab recast: drag every grabbed enemy to the aim point and
+  // slam them together, dealing the ability's damage to each.
+  function slamGrab() {
+    const grab = hero.grab;
+    hero.grab = null;
+    const aim = {
+      x: Math.max(20, Math.min(WORLD - 20, state.mouse.x)),
+      y: Math.max(20, Math.min(WORLD - 20, state.mouse.y)),
+    };
+    grab.targets.forEach(function (u) {
+      if (u.hp <= 0) return;
+      u.x = aim.x;
+      u.y = aim.y;
+      damageUnit(u, Sim.abilityDamage("stretchGrab", grab.rank, hero.bonusAd, hero.ap, u), hero);
+    });
+    state.projectiles.push({ x: aim.x, y: aim.y, vx: 0, vy: 0, radius: 120, life: 0.25, ringOnly: true });
+  }
+
+  // Elastic Launch: hold E to charge, release to fly.
+  function startCharge() {
+    if (hero.dead || hero.split || hero.flight || hero.chargeStart !== null) return;
+    const def = Sim.ABILITIES.elasticLaunch;
+    if (hero.cooldowns.elasticLaunch > 0 || hero.mana < def.manaCost) return;
+    hero.chargeStart = state.time;
+  }
+
+  function releaseLaunch() {
+    if (hero.chargeStart === null) return;
+    const chargeSeconds = state.time - hero.chargeStart;
+    hero.chargeStart = null;
+    if (hero.dead || hero.split || hero.flight) return;
+    const def = Sim.ABILITIES.elasticLaunch;
+    hero.mana -= def.manaCost;
+    hero.cooldowns.elasticLaunch = def.cooldown;
+    const range = Sim.launchRange(chargeSeconds);
+    const aim = { x: state.mouse.x, y: state.mouse.y };
+    const d = Math.max(1, dist(hero, aim));
+    const travel = Math.min(range, d);
+    hero.flight = {
+      fromX: hero.x,
+      fromY: hero.y,
+      toX: Math.max(hero.radius, Math.min(WORLD - hero.radius, hero.x + ((aim.x - hero.x) / d) * travel)),
+      toY: Math.max(hero.radius, Math.min(WORLD - hero.radius, hero.y + ((aim.y - hero.y) / d) * travel)),
+      start: state.time,
+      duration: 0.35 + travel / 1400,
+      rank: abilityRank("elasticLaunch"),
+    };
+    state.moveTarget = null;
+  }
+
+  function landLaunch() {
+    const def = Sim.ABILITIES.elasticLaunch;
+    const rank = hero.flight.rank;
+    hero.flight = null;
+    enemiesInRadius(hero, def.radius).forEach(function (u) {
+      damageUnit(u, Sim.abilityDamage("elasticLaunch", rank, hero.bonusAd, hero.ap, u), hero);
+      u.airborneUntil = state.time + def.knockupSeconds;
+    });
+    state.projectiles.push({ x: hero.x, y: hero.y, vx: 0, vy: 0, radius: def.radius, life: 0.3, ringOnly: true });
+  }
+
+  function knockbackUnit(unit, from, distance) {
+    const d = Math.max(1, dist(unit, from));
+    unit.x = Math.max(unit.radius, Math.min(WORLD - unit.radius, unit.x + ((unit.x - from.x) / d) * distance));
+    unit.y = Math.max(unit.radius, Math.min(WORLD - unit.radius, unit.y + ((unit.y - from.y) / d) * distance));
+  }
+
+  // One Boing Barrage bounce: hop toward the cursor, land with damage
+  // and a slow; the first bounce that touches an enemy also knocks it
+  // back a little.
+  function doBounce() {
+    const def = Sim.ABILITIES.boingBarrage;
+    const b = hero.bounce;
+    const aim = { x: state.mouse.x, y: state.mouse.y };
+    const d = dist(hero, aim);
+    if (d > 1) {
+      const step = Math.min(180, d);
+      hero.x += ((aim.x - hero.x) / d) * step;
+      hero.y += ((aim.y - hero.y) / d) * step;
+    }
+    hero.lastBounceAt = state.time;
+    enemiesInRadius(hero, def.radius).forEach(function (u) {
+      damageUnit(u, Sim.abilityDamage("boingBarrage", b.rank, hero.bonusAd, hero.ap, u), hero);
+      u.slowUntil = state.time + def.slowSeconds;
+      u.slowFraction = def.slowFraction;
+      if (!b.hit.has(u)) {
+        b.hit.add(u);
+        knockbackUnit(u, hero, def.knockbackDistance);
+      }
+    });
+    state.projectiles.push({ x: hero.x, y: hero.y, vx: 0, vy: 0, radius: def.radius, life: 0.3, ringOnly: true });
+    b.remaining -= 1;
+    b.nextAt = state.time + def.bounceInterval;
+    if (b.remaining <= 0) hero.bounce = null;
+  }
+
+  // Loose Gel: lethal damage splits Bloop into bloblets instead of
+  // killing him (when the passive is off cooldown).
+  function enterSplit() {
+    hero.split = true;
+    hero.splitAt = state.time;
+    hero.passiveReadyAt = state.time + Sim.PASSIVE.cooldown;
+    hero.grab = null;
+    hero.chargeStart = null;
+    hero.bounce = null;
+    hero.bloblets = [];
+    for (let i = 0; i < Sim.PASSIVE.blobletCount; i += 1) {
+      const angle = (i / Sim.PASSIVE.blobletCount) * Math.PI * 2;
+      hero.bloblets.push({
+        x: hero.x + Math.cos(angle) * 34,
+        y: hero.y + Math.sin(angle) * 34,
+        radius: 10,
+        maxHp: hero.maxHp * Sim.PASSIVE.blobletHpFraction,
+        hp: hero.maxHp * Sim.PASSIVE.blobletHpFraction,
+        rootUntil: 0,
+        lastAttacker: null,
       });
-      state.projectiles.push({ x: hero.x, y: hero.y, vx: 0, vy: 0, radius: 330, life: 0.35, ringOnly: true });
     }
   }
 
+  function killHero() {
+    hero.dead = true;
+    hero.deaths += 1;
+    hero.split = false;
+    hero.bloblets = [];
+    hero.grab = null;
+    hero.chargeStart = null;
+    hero.bounce = null;
+    hero.flight = null;
+    hero.respawnAt = state.time + 5 + hero.level * 0.5;
+  }
+
   function castReap() {
-    if (hero.dead || hero.cooldowns.reap > 0) return;
+    if (hero.dead || hero.split || hero.flight || hero.cooldowns.reap > 0) return;
     let best = null;
     let bestD = Infinity;
     state.camps.forEach(function (camp) {
@@ -414,9 +601,78 @@
         hero.dead = false;
         hero.hp = hero.maxHp;
         hero.mana = hero.maxMana;
+        hero.lastHp = hero.maxHp;
         hero.x = BLUE_BASE.x + 60;
         hero.y = BLUE_BASE.y - 60;
       }
+      return;
+    }
+
+    // Split into bloblets (Loose Gel): they crawl toward each other
+    // while enemies hunt them. Survive the merge timer and Bloop
+    // pulls himself back together; lose them all and he really dies.
+    if (hero.split) {
+      const alive = hero.bloblets.filter(function (b) { return b.hp > 0; });
+      if (alive.length === 0) {
+        killHero();
+        return;
+      }
+      const centroid = { x: 0, y: 0 };
+      alive.forEach(function (b) {
+        centroid.x += b.x;
+        centroid.y += b.y;
+      });
+      centroid.x /= alive.length;
+      centroid.y /= alive.length;
+      alive.forEach(function (b) {
+        if (dist(b, centroid) > 16) moveToward(b, centroid, 95, dt);
+      });
+      if (Sim.shouldRevive(alive.length, state.time - hero.splitAt)) {
+        hero.split = false;
+        hero.bloblets = [];
+        hero.x = centroid.x;
+        hero.y = centroid.y;
+        hero.hp = Sim.blobletReviveHp(hero.maxHp, alive.length);
+        hero.lastHp = hero.hp;
+      }
+      return;
+    }
+
+    // Loose Gel chunks: taking damage sheds a chunk now and then;
+    // walking over one heals. Chunks expire.
+    if (hero.hp < hero.lastHp && hero.hp > 0 && state.time >= hero.chunkCd) {
+      hero.chunkCd = state.time + Sim.PASSIVE.chunkDropCooldown;
+      state.chunks.push({
+        x: hero.x + (Math.random() - 0.5) * 60,
+        y: hero.y + (Math.random() - 0.5) * 60,
+        expiresAt: state.time + Sim.PASSIVE.chunkLifetimeSeconds,
+      });
+    }
+    state.chunks = state.chunks.filter(function (c) {
+      if (state.time >= c.expiresAt) return false;
+      if (dist(hero, c) <= hero.radius + 14) {
+        hero.hp = Math.min(hero.maxHp, hero.hp + Sim.chunkHealAmount(hero.maxHp));
+        return false;
+      }
+      return true;
+    });
+    hero.lastHp = hero.hp;
+
+    // Stretch Grab: the hold expires, and a grab on a dead enemy ends.
+    if (hero.grab) {
+      hero.grab.targets = hero.grab.targets.filter(function (u) { return u.hp > 0; });
+      if (hero.grab.targets.length === 0 || state.time >= hero.grab.expiresAt) {
+        hero.grab = null;
+      }
+    }
+
+    // Elastic Launch flight.
+    if (hero.flight) {
+      const f = hero.flight;
+      const t = Math.min(1, (state.time - f.start) / f.duration);
+      hero.x = f.fromX + (f.toX - f.fromX) * t;
+      hero.y = f.fromY + (f.toY - f.fromY) * t;
+      if (t >= 1) landLaunch();
       return;
     }
 
@@ -438,21 +694,26 @@
     });
     hero.attackCooldown -= dt;
 
+    // Boing Barrage bounces tick on their own timer.
+    if (hero.bounce && state.time >= hero.bounce.nextAt) doBounce();
+
     // Movement: arrow keys override click-to-move. (Letters are reserved
     // for abilities, so WASD movement is deliberately not used.)
+    // Charging Elastic Launch roots Bloop in place while he stretches.
+    const speedNow = hero.chargeStart !== null ? 0 : hero.moveSpeed;
     let vx = 0;
     let vy = 0;
     if (state.keys["arrowup"]) vy -= 1;
     if (state.keys["arrowdown"]) vy += 1;
     if (state.keys["arrowleft"]) vx -= 1;
     if (state.keys["arrowright"]) vx += 1;
-    if ((vx !== 0 || vy !== 0) && !isRooted(hero)) {
+    if ((vx !== 0 || vy !== 0) && !isRooted(hero) && speedNow > 0) {
       const len = Math.sqrt(vx * vx + vy * vy);
-      hero.x += (vx / len) * hero.moveSpeed * dt;
-      hero.y += (vy / len) * hero.moveSpeed * dt;
+      hero.x += (vx / len) * speedNow * dt;
+      hero.y += (vy / len) * speedNow * dt;
       state.moveTarget = null;
     } else if (state.moveTarget && !isRooted(hero)) {
-      moveToward(hero, state.moveTarget, hero.moveSpeed, dt);
+      moveToward(hero, state.moveTarget, speedNow, dt);
       if (dist(hero, state.moveTarget) < 6) state.moveTarget = null;
     }
     hero.x = Math.max(hero.radius, Math.min(WORLD - hero.radius, hero.x));
@@ -487,9 +748,12 @@
     }
 
     if (hero.hp <= 0) {
-      hero.dead = true;
-      hero.deaths += 1;
-      hero.respawnAt = state.time + 5 + hero.level * 0.5;
+      // Loose Gel gets one say before death does.
+      if (state.time >= hero.passiveReadyAt) {
+        enterSplit();
+      } else {
+        killHero();
+      }
     }
   }
 
@@ -503,7 +767,16 @@
       const hits = enemiesInRadius(p, 6);
       if (hits.length > 0) {
         const u = hits[0];
-        damageUnit(u, Sim.abilityDamage(p.damageKey, p.rank, hero.bonusAd, hero.ap, u), hero);
+        if (p.grabArm) {
+          // Stretch Grab: the first enemy touched is held for the slam.
+          hero.grab = {
+            targets: [u],
+            expiresAt: state.time + Sim.ABILITIES.stretchGrab.grabWindowSeconds,
+            rank: p.rank,
+          };
+        } else {
+          damageUnit(u, Sim.abilityDamage(p.damageKey, p.rank, hero.bonusAd, hero.ap, u), hero);
+        }
         return false;
       }
       return p.x >= 0 && p.x <= WORLD && p.y >= 0 && p.y <= WORLD;
@@ -657,24 +930,136 @@
       }
     });
 
-    // Hero.
-    if (!hero.dead) {
-      ctx.fillStyle = "#f2c14e";
+    // Gel chunks shed by the passive.
+    state.chunks.forEach(function (c, i) {
+      const pulse = 1 + 0.15 * Math.sin(state.time * 4 + i * 1.7);
+      ctx.fillStyle = "#6fdc5f";
       ctx.beginPath();
-      ctx.arc(hero.x, hero.y, hero.radius, 0, Math.PI * 2);
+      ctx.arc(c.x, c.y, 7 * pulse, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = "#fff7dd";
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.beginPath();
+      ctx.arc(c.x - 2, c.y - 2, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Hero.
+    if (hero.split) {
+      // Bloblets: little green blobs crawling toward each other.
+      hero.bloblets.forEach(function (b) {
+        if (b.hp <= 0) return;
+        ctx.fillStyle = "#57c84d";
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,0.45)";
+        ctx.beginPath();
+        ctx.arc(b.x - 3, b.y - 3, 3, 0, Math.PI * 2);
+        ctx.fill();
+        drawBar(b.x, b.y - b.radius - 10, 26, b.hp / b.maxHp, "#3fae4a");
+      });
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 22px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(
+        "Split! Bloblets merge in " + Math.max(0, Math.ceil(hero.splitAt + Sim.PASSIVE.blobletReviveSeconds - state.time)) + "s",
+        WORLD / 2,
+        60
+      );
+    } else if (!hero.dead) {
+      // Stretch Grab arm, while a victim is held.
+      if (hero.grab) {
+        hero.grab.targets.forEach(function (u) {
+          ctx.strokeStyle = "#57c84d";
+          ctx.lineWidth = 8;
+          ctx.beginPath();
+          ctx.moveTo(hero.x, hero.y);
+          ctx.lineTo(u.x, u.y);
+          ctx.stroke();
+          ctx.fillStyle = "#57c84d";
+          ctx.beginPath();
+          ctx.arc(u.x, u.y, 11, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+
+      // Flight arc for Elastic Launch: the blob rides above its shadow.
+      let lift = 0;
+      let sx = 1;
+      let sy = 1;
+      if (hero.flight) {
+        const t = Math.min(1, (state.time - hero.flight.start) / hero.flight.duration);
+        lift = Math.sin(t * Math.PI) * 64;
+        sx = 0.82;
+        sy = 1.28;
+        ctx.fillStyle = "rgba(0,0,0,0.3)";
+        ctx.beginPath();
+        ctx.arc(hero.x, hero.y, hero.radius * 0.8, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (hero.chargeStart !== null) {
+        // Charging: squash down as the stretch builds.
+        const f = Math.min(1, (state.time - hero.chargeStart) / Sim.ABILITIES.elasticLaunch.maxChargeSeconds);
+        sx = 1 + 0.3 * f;
+        sy = 1 - 0.3 * f;
+        // Landing preview: line and circle at the launch destination.
+        const range = Sim.launchRange(state.time - hero.chargeStart);
+        const d = Math.max(1, dist(hero, state.mouse));
+        const travel = Math.min(range, d);
+        const lx = hero.x + ((state.mouse.x - hero.x) / d) * travel;
+        const ly = hero.y + ((state.mouse.y - hero.y) / d) * travel;
+        ctx.strokeStyle = "rgba(111, 220, 95, 0.7)";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(hero.x, hero.y);
+        ctx.lineTo(lx, ly);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(lx, ly, Sim.ABILITIES.elasticLaunch.radius, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (state.time - hero.lastBounceAt < 0.28) {
+        // Just landed a bounce: squash, then recover.
+        const p = (state.time - hero.lastBounceAt) / 0.28;
+        sy = 1 - 0.35 * Math.sin(p * Math.PI);
+        sx = 1 + 0.3 * Math.sin(p * Math.PI);
+      }
+
+      // The blob himself: green gel with squash and stretch.
+      ctx.save();
+      ctx.translate(hero.x, hero.y - lift);
+      ctx.scale(sx, sy);
+      ctx.fillStyle = "#57c84d";
+      ctx.beginPath();
+      ctx.arc(0, 0, hero.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#2e7d32";
       ctx.lineWidth = 3;
       ctx.stroke();
-      ctx.fillStyle = "#1d2b1a";
-      ctx.font = "bold 13px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(hero.level + "", hero.x, hero.y + 5);
+      ctx.fillStyle = "rgba(255,255,255,0.35)";
+      ctx.beginPath();
+      ctx.arc(-6, -8, 8, 0, Math.PI * 2);
+      ctx.fill();
+      // Eyes, glancing toward the mouse.
+      const look = Math.atan2(state.mouse.y - hero.y, state.mouse.x - hero.x);
+      const lx2 = Math.cos(look) * 3;
+      const ly2 = Math.sin(look) * 3;
+      [-7, 7].forEach(function (ex) {
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.arc(ex, -4, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#1d2b1a";
+        ctx.beginPath();
+        ctx.arc(ex + lx2, -4 + ly2, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.restore();
+
       drawBar(hero.x, hero.y - hero.radius - 16, 56, hero.hp / hero.maxHp, "#3fae4a");
       drawBar(hero.x, hero.y - hero.radius - 9, 56, hero.mana / hero.maxMana, "#3a7bd5");
       ctx.fillStyle = "#ffffff";
       ctx.font = "12px sans-serif";
-      ctx.fillText(hero.name, hero.x, hero.y + hero.radius + 16);
+      ctx.textAlign = "center";
+      ctx.fillText(hero.name + "  Lv " + hero.level, hero.x, hero.y + hero.radius + 16);
     } else {
       ctx.fillStyle = "#ffffff";
       ctx.font = "bold 30px sans-serif";
@@ -712,7 +1097,7 @@
   }
 
   function updateHud() {
-    hud.level.textContent = "Level " + hero.level + "  Korrin, the Briar Knight";
+    hud.level.textContent = "Level " + hero.level + "  Bloop, the Bounceback Blob";
     hud.gold.textContent = "Gold " + Math.floor(hero.gold);
     hud.time.textContent = fmtTime(state.time);
     hud.hp.style.width = (100 * hero.hp) / hero.maxHp + "%";
@@ -720,12 +1105,26 @@
     const into = hero.xp - Sim.cumulativeXpForLevel(hero.level);
     const needed = Sim.xpToNextLevel(hero.level);
     hud.xp.style.width = (100 * into) / needed + "%";
+    const qLabel = hero.grab
+      ? "Q SLAM!"
+      : hero.cooldowns.stretchGrab > 0
+        ? "Q Stretch Grab " + hero.cooldowns.stretchGrab.toFixed(1)
+        : "Q Stretch Grab ready";
+    const eLabel = hero.chargeStart !== null
+      ? "E CHARGING " + Math.round(Sim.launchRange(state.time - hero.chargeStart))
+      : cdText("elasticLaunch", "E Elastic Launch");
+    const passiveLabel = hero.split
+      ? "Loose Gel: SPLIT"
+      : state.time >= hero.passiveReadyAt
+        ? "Loose Gel ready"
+        : "Loose Gel " + Math.ceil(hero.passiveReadyAt - state.time) + "s";
     hud.abilities.textContent =
-      cdText("briarLash", "Q Briar Lash") + "   |   " +
-      cdText("rootSnare", "W Root Snare") + "   |   " +
-      cdText("thornDash", "E Thorn Dash") + "   |   " +
-      cdText("verdantCataclysm", "R Verdant Cataclysm") + "   |   " +
-      "F Reap " + (hero.cooldowns.reap > 0 ? hero.cooldowns.reap.toFixed(1) : "ready");
+      qLabel + "   |   " +
+      cdText("oozeBurst", "W Ooze Burst") + "   |   " +
+      eLabel + "   |   " +
+      cdText("boingBarrage", "R Boing Barrage") + "   |   " +
+      "F Reap " + (hero.cooldowns.reap > 0 ? hero.cooldowns.reap.toFixed(1) : "ready") + "   |   " +
+      passiveLabel;
   }
 
   // ------------------------------------------------------------ input
@@ -748,15 +1147,17 @@
   window.addEventListener("keydown", function (evt) {
     const k = evt.key.toLowerCase();
     state.keys[k] = true;
-    if (k === "q") castAbility("briarLash");
-    if (k === "w") castAbility("rootSnare");
-    if (k === "e") castAbility("thornDash");
-    if (k === "r") castAbility("verdantCataclysm");
+    if (k === "q") castAbility("stretchGrab");
+    if (k === "w") castAbility("oozeBurst");
+    if (k === "e" && !evt.repeat) startCharge(); // hold to charge Elastic Launch
+    if (k === "r") castAbility("boingBarrage");
     if (k === "f") castReap();
     if (["arrowup", "arrowdown", "arrowleft", "arrowright", " "].indexOf(k) >= 0) evt.preventDefault();
   });
   window.addEventListener("keyup", function (evt) {
-    state.keys[evt.key.toLowerCase()] = false;
+    const k = evt.key.toLowerCase();
+    state.keys[k] = false;
+    if (k === "e") releaseLaunch();
   });
 
   // ------------------------------------------------------------ main loop

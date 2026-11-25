@@ -22,17 +22,20 @@ No build step, no dependencies, nothing to install.
 
 - **Move:** arrow keys, or right-click a destination.
 - **Aim:** mouse.
-- **Q / W / E / R:** abilities (Briar Lash, Root Snare, Thorn Dash,
-  Verdant Cataclysm).
+- **Q / W / E / R:** abilities (Stretch Grab, Ooze Burst, Elastic Launch,
+  Boing Barrage). Q is two-part: cast to grab, cast again to slam.
+  E is hold-and-release: hold to charge the launch, release to fly.
 - **F:** Reap, the camp execute. Use it on a camp monster to deal heavy
   true damage, or to finish it outright below the execute threshold.
 - Your champion auto-attacks the nearest enemy in range. Last-hit red
   minions for full gold, clear camps between waves, and watch the respawn
   timers printed on cleared camps to plan your next route.
 
-You play **Korrin, the Briar Knight**, the first champion. The design
-contract in [docs/design.md](docs/design.md) documents every mechanic and
-number in the game.
+You play **Bloop, the Bounceback Blob**, the first champion: a green slime
+tank whose passive drops healing gel chunks when he is hurt and splits him
+into bloblets instead of letting him die. The design contract in
+[docs/design.md](docs/design.md) documents every mechanic and number in
+the game.
 
 ## Run the tests
 
@@ -48,9 +51,10 @@ This repository is designed so that an AI agent (or a human) can arrive
 cold, find work, and ship it without anyone assigning tasks by hand:
 
 1. **The board.** One GitHub issue, titled "Coordinating who works on
-   what", holds a table of planned work. Every item has a stable ID
-   (GAME-001 and up), a description, the code it lives in, what it needs,
-   and a status.
+   what", holds a table of planned work:
+   https://github.com/Dashhhhhhhh/moba-sandbox/issues/1
+   Every item has a stable ID (GAME-001 and up), a description, the code
+   it lives in, what it needs, and a status.
 2. **Claims.** Before writing code, a contributor comments
    `claiming: <ID>` in that issue. New work is proposed with a
    `finding:` comment. Finished work is reported with

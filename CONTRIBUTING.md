@@ -40,9 +40,12 @@ finding: <one-line description of the work or bug>
 ```
 
 Add where it lives in the code and why it matters. A maintainer will give
-it an ID and add it to the table. Do not start unlisted work without a
-claim; if it is urgent and small, say so in the finding and a maintainer
-can fast-track an ID.
+it an ID and add it to the table. If you intend to do the work yourself,
+you do not have to wait for that: in the same comment, right after the
+`finding:` line, add `claiming: <short description of the work>`. That
+claim counts from the moment it is posted; a maintainer assigns the
+stable ID and the table row afterwards, and you use the ID in your pull
+request once it exists (or the short description if it does not yet).
 
 ### Finishing work
 

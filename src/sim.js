@@ -124,52 +124,70 @@ function mitigateMagic(rawDamage, magicResist) {
   return mitigatePhysical(rawDamage, magicResist);
 }
 
-// Ability definitions for Korrin, the Briar Knight. Damage values are per
-// rank (index 0 is rank 1). Ratios multiply bonus attack damage (bonusAd)
-// or ability power (ap) as noted per ability.
+// Ability definitions for Bloop, the Bounceback Blob. Damage values are
+// per rank (index 0 is rank 1). Ratios multiply bonus attack damage
+// (bonusAd) or ability power (ap) as noted per ability. An ability with a
+// maxHpRatio also deals that fraction of the target's max health as raw
+// damage (added before mitigation, inside abilityDamage).
 const ABILITIES = {
-  briarLash: {
-    name: "Briar Lash",
-    cooldown: 7,
-    manaCost: 50,
-    damageType: "physical",
-    baseDamage: [70, 105, 140, 175, 210],
-    adRatio: 0.7,
-    apRatio: 0,
-  },
-  rootSnare: {
-    name: "Root Snare",
-    cooldown: 12,
-    manaCost: 70,
+  stretchGrab: {
+    name: "Stretch Grab",
+    cooldown: 11,
+    manaCost: 55,
     damageType: "magic",
+    // Damage is dealt by the recast slam, not by the grab itself.
     baseDamage: [60, 95, 130, 165, 200],
     adRatio: 0,
     apRatio: 0.6,
-    rootSeconds: [1.0, 1.15, 1.3, 1.45, 1.6],
+    grabRange: 550,
+    grabWindowSeconds: 4,
   },
-  thornDash: {
-    name: "Thorn Dash",
+  oozeBurst: {
+    name: "Ooze Burst",
     cooldown: 10,
-    manaCost: 40,
-    damageType: "physical",
-    baseDamage: [40, 65, 90, 115, 140],
-    adRatio: 0.5,
-    apRatio: 0,
-    dashRange: 425,
+    manaCost: 60,
+    damageType: "magic",
+    baseDamage: [50, 75, 100, 125, 150],
+    adRatio: 0,
+    apRatio: 0.3,
+    maxHpRatio: [0.05, 0.06, 0.07, 0.08, 0.09],
+    radius: 230,
   },
-  verdantCataclysm: {
-    name: "Verdant Cataclysm",
-    cooldown: 90,
+  elasticLaunch: {
+    name: "Elastic Launch",
+    cooldown: 14,
+    manaCost: 60,
+    damageType: "magic",
+    baseDamage: [60, 90, 120, 150, 180],
+    adRatio: 0,
+    apRatio: 0.5,
+    minRange: 300,
+    maxRange: 800,
+    maxChargeSeconds: 1.2,
+    knockupSeconds: 1.0,
+    radius: 200,
+  },
+  boingBarrage: {
+    name: "Boing Barrage",
+    cooldown: 100,
     manaCost: 100,
     damageType: "magic",
-    baseDamage: [200, 300, 400],
+    // Damage is per bounce.
+    baseDamage: [120, 170, 220],
     adRatio: 0,
-    apRatio: 0.9,
+    apRatio: 0.4,
+    bounces: 4,
+    radius: 240,
+    slowFraction: 0.3,
+    slowSeconds: 1.0,
+    bounceInterval: 0.75,
+    knockbackDistance: 120,
   },
 };
 
-// Raw (pre-mitigation) damage of an ability at a 1-based rank, given the
-// caster's bonus attack damage and ability power.
+// Raw (pre-mitigation) flat damage of an ability at a 1-based rank, given
+// the caster's bonus attack damage and ability power. Does not include
+// any max-health component; see abilityMaxHpDamage.
 function abilityRawDamage(abilityKey, rank, bonusAd, ap) {
   const def = ABILITIES[abilityKey];
   if (!def) throw new Error("unknown ability: " + abilityKey);
@@ -177,12 +195,74 @@ function abilityRawDamage(abilityKey, rank, bonusAd, ap) {
   return def.baseDamage[idx] + def.adRatio * bonusAd + def.apRatio * ap;
 }
 
-// Full pipeline: raw damage, then mitigation by the matching defense stat.
+// Raw damage an ability deals from the target's max health alone (0 for
+// abilities without a maxHpRatio).
+function abilityMaxHpDamage(abilityKey, rank, targetMaxHp) {
+  const def = ABILITIES[abilityKey];
+  if (!def) throw new Error("unknown ability: " + abilityKey);
+  if (!def.maxHpRatio) return 0;
+  const idx = Math.min(rank, def.maxHpRatio.length) - 1;
+  return def.maxHpRatio[idx] * targetMaxHp;
+}
+
+// Full pipeline: raw damage (flat plus any max-health component), then
+// mitigation by the matching defense stat.
 function abilityDamage(abilityKey, rank, bonusAd, ap, target) {
   const def = ABILITIES[abilityKey];
-  const raw = abilityRawDamage(abilityKey, rank, bonusAd, ap);
+  let raw = abilityRawDamage(abilityKey, rank, bonusAd, ap);
+  if (def.maxHpRatio) raw += abilityMaxHpDamage(abilityKey, rank, target.maxHp || 0);
   if (def.damageType === "physical") return mitigatePhysical(raw, target.armor);
   return mitigateMagic(raw, target.magicResist);
+}
+
+// Launch distance for Elastic Launch after charging for `chargeSeconds`.
+// Zero charge still hops minRange; a full charge (maxChargeSeconds or
+// longer) reaches maxRange.
+function launchRange(chargeSeconds) {
+  const def = ABILITIES.elasticLaunch;
+  const frac = Math.max(0, Math.min(1, chargeSeconds / def.maxChargeSeconds));
+  return def.minRange + frac * (def.maxRange - def.minRange);
+}
+
+// ------------------------------------------------------------- passive
+
+// Loose Gel, Bloop's passive. When Bloop takes damage, a chunk of gel
+// drops off (at most one per chunkDropCooldown seconds); walking over a
+// chunk heals him. On lethal damage he instead splits into bloblets that
+// crawl toward each other; if at least one is still alive after
+// blobletReviveSeconds, he pulls himself back together with partial HP.
+const PASSIVE = {
+  name: "Loose Gel",
+  chunkHealFraction: 0.06, // of max HP, per chunk picked up
+  chunkDropCooldown: 4, // seconds between chunk drops
+  chunkLifetimeSeconds: 25,
+  blobletCount: 4,
+  blobletHpFraction: 0.12, // of Bloop's max HP, per bloblet
+  blobletReviveSeconds: 6,
+  reviveBaseFraction: 0.1, // of max HP on revive, plus per survivor:
+  revivePerBlobletFraction: 0.05,
+  cooldown: 90, // seconds from the split until the passive can fire again
+};
+
+// Health restored by picking up one gel chunk.
+function chunkHealAmount(maxHp) {
+  return maxHp * PASSIVE.chunkHealFraction;
+}
+
+// Health Bloop revives with when `survivingBloblets` bloblets make it to
+// the merge. Zero survivors means no revive (0).
+function blobletReviveHp(maxHp, survivingBloblets) {
+  if (survivingBloblets <= 0) return 0;
+  const frac =
+    PASSIVE.reviveBaseFraction +
+    PASSIVE.revivePerBlobletFraction * survivingBloblets;
+  return maxHp * frac;
+}
+
+// True when the bloblets have survived long enough, with at least one
+// still alive, for Bloop to revive.
+function shouldRevive(survivingBloblets, elapsedSeconds) {
+  return survivingBloblets > 0 && elapsedSeconds >= PASSIVE.blobletReviveSeconds;
 }
 
 // ------------------------------------------------------- Reap (camp execute)
@@ -222,7 +302,13 @@ const Sim = {
   mitigateMagic,
   ABILITIES,
   abilityRawDamage,
+  abilityMaxHpDamage,
   abilityDamage,
+  launchRange,
+  PASSIVE,
+  chunkHealAmount,
+  blobletReviveHp,
+  shouldRevive,
   reapDamage,
   reapExecutes,
 };
