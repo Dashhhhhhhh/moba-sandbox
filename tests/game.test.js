@@ -172,6 +172,32 @@ test("minion attacks are mitigated by the target's armor", function () {
   assert.ok(Math.abs(towerDrop - Sim.mitigatePhysical(11, 30)) < 0.01, "tower drop " + towerDrop);
 });
 
+test("elastic launch fizzles when its mana was spent during the charge", function () {
+  const T = loadGame();
+  parkHero(T, 750, 750);
+  T.hero.mana = 100; // enough for either cast, not both (60 + 60)
+  T.startCharge();
+  T.castAbility("oozeBurst"); // spends 60 mid-charge, leaving 40
+  assert.equal(T.hero.mana, 40);
+  T.state.mouse.x = 1050;
+  T.state.mouse.y = 750;
+  T.releaseLaunch();
+  assert.equal(T.hero.mana, 40); // never negative
+  assert.equal(T.hero.flight, null); // no free flight
+  assert.equal(T.hero.cooldowns.elasticLaunch, 0); // no cooldown either
+});
+
+test("elastic launch still fires when the mana is there", function () {
+  const T = loadGame();
+  parkHero(T, 750, 750);
+  T.state.mouse.x = 1050;
+  T.state.mouse.y = 750;
+  T.startCharge();
+  T.releaseLaunch();
+  assert.notEqual(T.hero.flight, null);
+  assert.equal(T.hero.mana, T.hero.maxMana - Sim.ABILITIES.elasticLaunch.manaCost);
+});
+
 test("boing barrage casts normally at level 6", function () {
   const T = loadGame();
   parkHero(T, 750, 750);

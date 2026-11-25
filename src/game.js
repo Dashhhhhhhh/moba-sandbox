@@ -559,6 +559,10 @@
     hero.chargeStart = null;
     if (hero.dead || hero.split || hero.flight) return;
     const def = Sim.ABILITIES.elasticLaunch;
+    // The mana cost is only committed on release, and other casts
+    // during the charge may have spent it. If it is no longer there,
+    // the launch fizzles instead of driving mana negative.
+    if (hero.mana < def.manaCost) return;
     hero.mana -= def.manaCost;
     hero.cooldowns.elasticLaunch = def.cooldown;
     const range = Sim.launchRange(chargeSeconds);
