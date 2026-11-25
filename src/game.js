@@ -267,24 +267,21 @@
 
   function spawnWave() {
     state.waveCount += 1;
-    const kinds = ["melee", "melee", "melee", "caster", "caster", "caster"];
-    if (state.waveCount % 3 === 0) kinds.push("siege");
-    ["blue", "red"].forEach(function (team) {
-      const path = team === "blue" ? LANES.mid : LANES.mid.slice().reverse();
-      kinds.forEach(function (kind, i) {
+    Sim.minionWaveGroups(LANES, state.waveCount).forEach(function (group) {
+      group.kinds.forEach(function (kind, i) {
         const s = MINION_STATS[kind];
         state.minions.push({
-          team: team,
+          team: group.team,
           kind: kind,
-          x: path[0].x + (i % 3) * 26 - 26,
-          y: path[0].y + Math.floor(i / 3) * 26 - 13,
+          x: group.path[0].x + (i % 3) * 26 - 26,
+          y: group.path[0].y + Math.floor(i / 3) * 26 - 13,
           radius: s.radius,
           maxHp: s.hp,
           hp: s.hp,
           damage: s.damage,
           range: s.range,
           speed: s.speed,
-          path: path,
+          path: group.path,
           waypoint: 1,
           attackCooldown: 0,
           rootUntil: 0,

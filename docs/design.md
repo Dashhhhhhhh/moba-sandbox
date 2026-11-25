@@ -68,9 +68,8 @@ is original to this project.
 - Physical mitigation: damage * 100 / (100 + armor) for positive armor;
   negative armor amplifies with the mirrored curve. Magic uses the same
   curve against magic resist.
-- Minion waves: every 30 s from both bases on mid lane in the prototype
-  (all three lanes are future work). A wave is 3 melee + 3 caster minions,
-  plus a siege minion every third wave.
+- Minion waves: every 30 s from both bases on all three lanes. Each lane's
+  wave is 3 melee + 3 caster minions, plus a siege minion every third wave.
 
 ### Towers
 
