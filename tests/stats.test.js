@@ -50,6 +50,8 @@ test("camp balance stats distinguish original camp profiles", function () {
     monsterHp: 950,
     monsterDamage: 22,
     monsterRadius: 24,
+    armor: 12,
+    magicResist: 12,
     gold: 90,
     xp: 120,
   });
@@ -59,6 +61,8 @@ test("camp balance stats distinguish original camp profiles", function () {
     monsterHp: 520,
     monsterDamage: 11,
     monsterRadius: 17,
+    armor: 12,
+    magicResist: 12,
     gold: 70,
     xp: 95,
   });
@@ -68,6 +72,8 @@ test("camp balance stats distinguish original camp profiles", function () {
     monsterHp: 640,
     monsterDamage: 13,
     monsterRadius: 17,
+    armor: 12,
+    magicResist: 12,
     gold: 75,
     xp: 100,
   });
@@ -77,6 +83,8 @@ test("camp balance stats distinguish original camp profiles", function () {
     monsterHp: 480,
     monsterDamage: 12,
     monsterRadius: 17,
+    armor: 12,
+    magicResist: 12,
     gold: 65,
     xp: 90,
   });

@@ -144,6 +144,8 @@
         radius: stats.monsterRadius,
         maxHp: stats.monsterHp,
         hp: stats.monsterHp,
+        armor: stats.armor,
+        magicResist: stats.magicResist,
         damage: stats.monsterDamage,
         attackCooldown: 0,
         rootUntil: 0,
@@ -686,11 +688,6 @@
     state.camps.forEach(function (camp) {
       camp.monsters.forEach(function (mon) {
         if (mon.hp > 0 && dist(point, mon) <= radius + mon.radius) {
-          // Give monsters the defense stats abilityDamage expects.
-          if (mon.armor === undefined) {
-            mon.armor = 12;
-            mon.magicResist = 12;
-          }
           out.push(mon);
         }
       });

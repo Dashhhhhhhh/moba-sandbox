@@ -70,6 +70,9 @@ is original to this project.
 | Stone Golems | 2 | 640 | 13 | 17 | 75 | 100 |
 | Thornbacks | 2 | 480 | 12 | 17 | 65 | 90 |
 
+- Camp monsters have 12 armor and 12 magic resist, assigned from
+  `Sim.CAMP_STATS` when they spawn.
+
 ### Combat
 
 - Physical mitigation: damage * 100 / (100 + armor) for positive armor;

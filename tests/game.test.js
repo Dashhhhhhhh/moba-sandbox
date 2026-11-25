@@ -110,6 +110,46 @@ test("boing barrage cannot be cast before level 6", function () {
   assert.equal(T.hero.cooldowns.boingBarrage, 0);
 });
 
+test("camp monsters spawn with catalog armor and resist", function () {
+  const T = loadGame();
+  T.state.camps.forEach(function (camp) {
+    camp.monsters.forEach(function (mon) {
+      assert.equal(mon.armor, camp.def.stats.armor);
+      assert.equal(mon.magicResist, camp.def.stats.magicResist);
+    });
+  });
+});
+
+test("basic attacks on a camp monster do not depend on touch order", function () {
+  // Untouched monster: the first basic attack uses its spawn armor.
+  const T = loadGame();
+  parkHero(T, 300, 900);
+  const camp = T.state.camps.find(function (c) { return c.def.id === "blue-wolves"; });
+  const wolf = camp.monsters[0];
+  T.hero.x = wolf.x + 100;
+  T.hero.y = wolf.y;
+  const hpA = wolf.hp;
+  step(T, 0.05);
+  const hitUntouched = hpA - wolf.hp;
+
+  // Ability-touched monster: an Ooze Burst radius query touches it
+  // first, then the first basic attack lands.
+  const T2 = loadGame();
+  parkHero(T2, 300, 900);
+  const camp2 = T2.state.camps.find(function (c) { return c.def.id === "blue-wolves"; });
+  const wolf2 = camp2.monsters[0];
+  T2.hero.x = wolf2.x;
+  T2.hero.y = wolf2.y;
+  T2.castAbility("oozeBurst");
+  const hpB = wolf2.hp;
+  step(T2, 0.05);
+  const hitTouched = hpB - wolf2.hp;
+
+  const expected = Sim.mitigatePhysical(62, 12);
+  assert.ok(Math.abs(hitUntouched - expected) < 0.01, "untouched hit " + hitUntouched);
+  assert.ok(Math.abs(hitTouched - expected) < 0.01, "touched hit " + hitTouched);
+});
+
 test("boing barrage casts normally at level 6", function () {
   const T = loadGame();
   parkHero(T, 750, 750);
