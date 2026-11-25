@@ -87,6 +87,68 @@ const CAMP_STATS = Object.freeze({
   }),
 });
 
+const EPIC_BOSS_STATS = Object.freeze({
+  gorehorn: Object.freeze({
+    displayName: "Gorehorn, the Hollow Elder",
+    maxHp: 4000,
+    damage: 52,
+    damageType: "physical",
+    range: 100,
+    radius: 36,
+    speed: 85,
+    attackPeriod: 1.6,
+    leashRange: 520,
+    armor: 30,
+    magicResist: 20,
+    goldPerChampion: 150,
+    xpPerChampion: 240,
+    buffName: "Hollow Might",
+    buffDuration: 90,
+    attackDamageBonus: 12,
+    healthRegenPerSecond: 0,
+  }),
+  vessikar: Object.freeze({
+    displayName: "Vessikar, the Tidewyrm",
+    maxHp: 3400,
+    damage: 44,
+    damageType: "magic",
+    range: 300,
+    radius: 34,
+    speed: 0,
+    attackPeriod: 1.8,
+    leashRange: 520,
+    armor: 20,
+    magicResist: 35,
+    goldPerChampion: 150,
+    xpPerChampion: 240,
+    buffName: "Tide's Renewal",
+    buffDuration: 90,
+    attackDamageBonus: 0,
+    healthRegenPerSecond: 6,
+  }),
+});
+
+function epicBossReward(bossKey, team, now) {
+  if (!Object.prototype.hasOwnProperty.call(EPIC_BOSS_STATS, bossKey)) {
+    throw new Error("unknown epic boss: " + bossKey);
+  }
+  if (team !== "blue" && team !== "red") {
+    throw new Error("unknown team: " + team);
+  }
+  const stats = EPIC_BOSS_STATS[bossKey];
+  return {
+    team: team,
+    goldPerChampion: stats.goldPerChampion,
+    xpPerChampion: stats.xpPerChampion,
+    buff: {
+      name: stats.buffName,
+      expiresAt: now + stats.buffDuration,
+      attackDamageBonus: stats.attackDamageBonus,
+      healthRegenPerSecond: stats.healthRegenPerSecond,
+    },
+  };
+}
+
 // ---------------------------------------------------------------- economy
 
 // Gold granted for landing the killing blow on a minion, by minion kind.
@@ -454,6 +516,8 @@ const Sim = {
   getChampionDefinition,
   MINION_STATS,
   CAMP_STATS,
+  EPIC_BOSS_STATS,
+  epicBossReward,
   LAST_HIT_GOLD,
   SHARED_GOLD,
   AMBIENT_GOLD_START,
