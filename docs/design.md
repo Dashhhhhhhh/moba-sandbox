@@ -26,9 +26,9 @@ is original to this project.
   - North pit: Gorehorn, the Hollow Elder (boss encounter is GAME-006).
   - South pit: Vessikar, the Tidewyrm (boss encounter is GAME-006).
 - Each side of the jungle holds four camps, mirrored through the centre:
-  - Crimson Brute (buff camp, 1 monster): will grant the Ember Sigil buff
-    when slain (buff effect is future work; the camp ships in the
-    prototype without it).
+  - Crimson Brute (buff camp, 1 monster): grants the Ember Sigil for
+    60 seconds when cleared. It increases basic attack damage by 12%;
+    clearing another Crimson Brute refreshes the duration.
   - Ember Wolves (small camp, 2 monsters).
   - Stone Golems (small camp, 2 monsters).
   - Thornbacks (small camp, 2 monsters).
@@ -60,6 +60,8 @@ is original to this project.
 
 - Respawn after a full clear: small camps 150 s, buff camps 300 s, epic
   objectives 360 s. The timer starts when the last monster of the camp dies.
+- Clearing a Crimson Brute grants or refreshes the Ember Sigil for 60 s,
+  increasing basic attack damage by 12%. The HUD shows its remaining time.
 - Camp combat and reward values live in `Sim.CAMP_STATS`; map positions
   remain in `src/game.js`.
 

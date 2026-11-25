@@ -49,3 +49,20 @@ test("a camp can be cleared again after respawning", function () {
   assert.equal(camp.respawnAt, 800);
   assert.equal(Sim.campRespawnRemaining(camp, 650), 150);
 });
+
+test("Ember Sigil grants a timed basic attack damage bonus", function () {
+  const expiresAt = Sim.applyEmberSigil(75);
+  assert.equal(expiresAt, 135);
+  assert.equal(Sim.emberSigilRemaining(expiresAt, 90), 45);
+  assert.ok(Math.abs(Sim.emberSigilAttackDamage(100, expiresAt, 90) - 112) < 1e-9);
+  assert.equal(Sim.emberSigilRemaining(expiresAt, 135), 0);
+  assert.equal(Sim.emberSigilAttackDamage(100, expiresAt, 135), 100);
+});
+
+test("re-clearing a buff camp refreshes rather than stacks Ember Sigil", function () {
+  const firstExpiry = Sim.applyEmberSigil(10);
+  const refreshedExpiry = Sim.applyEmberSigil(40);
+  assert.equal(firstExpiry, 70);
+  assert.equal(refreshedExpiry, 100);
+  assert.ok(Math.abs(Sim.emberSigilAttackDamage(100, refreshedExpiry, 80) - 112) < 1e-9);
+});
