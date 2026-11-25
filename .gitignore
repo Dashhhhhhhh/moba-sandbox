@@ -1,0 +1,20 @@
+# Dependencies (the project has none, but keep them out if that ever changes)
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor files
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Scratch and probe scripts
+tmp/
+probe/
+
+# Logs
+*.log
