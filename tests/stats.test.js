@@ -43,6 +43,19 @@ test("minion combat stats are available from the simulation catalog", function (
   assert.equal(Object.isFrozen(Sim.MINION_STATS.melee), true);
 });
 
+test("progression and Reap tuning live in the simulation catalog", function () {
+  assert.equal(Sim.STARTING_GOLD, 475);
+  assert.deepEqual(Sim.LEVEL_GROWTH, {
+    attackDamage: 4,
+    maxHp: 95,
+    maxMana: 35,
+    levelUpHeal: 120,
+  });
+  assert.equal(Sim.respawnTime(1), 5.5);
+  assert.equal(Sim.respawnTime(10), 10);
+  assert.deepEqual(Sim.REAP, { cooldown: 15, range: 320 });
+});
+
 test("camp balance stats distinguish original camp profiles", function () {
   assert.deepEqual(Sim.CAMP_STATS.buff, {
     kind: "buff",
@@ -50,6 +63,8 @@ test("camp balance stats distinguish original camp profiles", function () {
     monsterHp: 950,
     monsterDamage: 22,
     monsterRadius: 24,
+    armor: 12,
+    magicResist: 12,
     gold: 90,
     xp: 120,
   });
@@ -59,6 +74,8 @@ test("camp balance stats distinguish original camp profiles", function () {
     monsterHp: 520,
     monsterDamage: 11,
     monsterRadius: 17,
+    armor: 12,
+    magicResist: 12,
     gold: 70,
     xp: 95,
   });
@@ -68,6 +85,8 @@ test("camp balance stats distinguish original camp profiles", function () {
     monsterHp: 640,
     monsterDamage: 13,
     monsterRadius: 17,
+    armor: 12,
+    magicResist: 12,
     gold: 75,
     xp: 100,
   });
@@ -77,6 +96,8 @@ test("camp balance stats distinguish original camp profiles", function () {
     monsterHp: 480,
     monsterDamage: 12,
     monsterRadius: 17,
+    armor: 12,
+    magicResist: 12,
     gold: 65,
     xp: 90,
   });

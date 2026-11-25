@@ -55,6 +55,9 @@ is original to this project.
 - Minion XP: melee 60, caster 30, siege 90, split evenly (floor) among
   nearby allies.
 - XP to level: going from level L to L+1 costs 180 + (L - 1) * 90 XP.
+- Level growth: +95 max HP, +35 max mana, and +4 attack damage per
+  level; leveling up restores 120 HP and refills mana.
+- Respawn after death: 5 s plus 0.5 s per level.
 
 ### Camps
 
@@ -69,6 +72,9 @@ is original to this project.
 | Ember Wolves | 2 | 520 | 11 | 17 | 70 | 95 |
 | Stone Golems | 2 | 640 | 13 | 17 | 75 | 100 |
 | Thornbacks | 2 | 480 | 12 | 17 | 65 | 90 |
+
+- Camp monsters have 12 armor and 12 magic resist, assigned from
+  `Sim.CAMP_STATS` when they spawn.
 
 ### Combat
 
@@ -151,7 +157,7 @@ slingshotting himself into fights. Base stats in the prototype: 680 HP,
   landing deals magic damage 120 to 220 by rank plus 0.4 ability power
   to enemies within 240 units and slows them by 30% for 1.0 s. The
   first bounce that hits a given enemy also knocks it back 120 units.
-  Cooldown 100 s, mana 100.
+  Cooldown 100 s, mana 100. Unlocks at level 6.
 
 ## Win condition
 

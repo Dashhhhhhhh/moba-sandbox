@@ -55,6 +55,8 @@ const CAMP_STATS = Object.freeze({
     monsterHp: 950,
     monsterDamage: 22,
     monsterRadius: 24,
+    armor: 12,
+    magicResist: 12,
     gold: 90,
     xp: 120,
   }),
@@ -64,6 +66,8 @@ const CAMP_STATS = Object.freeze({
     monsterHp: 520,
     monsterDamage: 11,
     monsterRadius: 17,
+    armor: 12,
+    magicResist: 12,
     gold: 70,
     xp: 95,
   }),
@@ -73,6 +77,8 @@ const CAMP_STATS = Object.freeze({
     monsterHp: 640,
     monsterDamage: 13,
     monsterRadius: 17,
+    armor: 12,
+    magicResist: 12,
     gold: 75,
     xp: 100,
   }),
@@ -82,6 +88,8 @@ const CAMP_STATS = Object.freeze({
     monsterHp: 480,
     monsterDamage: 12,
     monsterRadius: 17,
+    armor: 12,
+    magicResist: 12,
     gold: 65,
     xp: 90,
   }),
@@ -98,6 +106,9 @@ const LAST_HIT_GOLD = {
 
 // Gold a nearby ally receives when a minion dies without them last hitting.
 const SHARED_GOLD = 6;
+
+// Gold every champion starts the game with.
+const STARTING_GOLD = 475;
 
 // Ambient gold: every AMBIENT_GOLD_TICK seconds after AMBIENT_GOLD_START.
 const AMBIENT_GOLD_START = 60; // seconds into the game
@@ -151,6 +162,19 @@ function splitXp(amount, count) {
   return Math.floor(amount / count);
 }
 
+// Stat growth the game layer applies when a champion levels up.
+const LEVEL_GROWTH = Object.freeze({
+  attackDamage: 4, // per level above 1
+  maxHp: 95, // per level gained
+  maxMana: 35, // per level gained
+  levelUpHeal: 120, // HP restored on leveling up (mana refills fully)
+});
+
+// Seconds a champion stays dead after dying at `level`.
+function respawnTime(level) {
+  return 5 + level * 0.5;
+}
+
 // ---------------------------------------------------------------- camps
 
 // Respawn delays in seconds, counted from the moment the camp is fully
@@ -170,8 +194,11 @@ function createCamp(kind) {
 }
 
 // Marks a camp cleared at time `now` and schedules its respawn.
-// Returns the camp for chaining.
+// Returns the camp for chaining. Clearing an already cleared camp is a
+// no-op: the respawn timer runs from the first clear, and a double
+// clear must not silently extend it.
 function clearCamp(camp, now) {
+  if (!camp.alive) return camp;
   camp.alive = false;
   camp.clearedAt = now;
   camp.respawnAt = now + CAMP_RESPAWN[camp.kind];
@@ -268,6 +295,7 @@ const ABILITIES = {
     name: "Boing Barrage",
     cooldown: 100,
     manaCost: 100,
+    unlockLevel: 6,
     damageType: "magic",
     // Damage is per bounce.
     baseDamage: [120, 170, 220],
@@ -282,13 +310,24 @@ const ABILITIES = {
   },
 };
 
+// Index into a per-rank values array. Ranks are 1-based; a rank above
+// the defined values clamps to the last one. An invalid rank (below 1,
+// or not a finite number) throws, like an unknown ability key does,
+// instead of silently producing NaN damage.
+function abilityRankIndex(values, rank) {
+  if (typeof rank !== "number" || !Number.isFinite(rank) || rank < 1) {
+    throw new Error("invalid ability rank: " + rank);
+  }
+  return Math.min(Math.floor(rank), values.length) - 1;
+}
+
 // Raw (pre-mitigation) flat damage of an ability at a 1-based rank, given
 // the caster's bonus attack damage and ability power. Does not include
 // any max-health component; see abilityMaxHpDamage.
 function abilityRawDamage(abilityKey, rank, bonusAd, ap) {
   const def = ABILITIES[abilityKey];
   if (!def) throw new Error("unknown ability: " + abilityKey);
-  const idx = Math.min(rank, def.baseDamage.length) - 1;
+  const idx = abilityRankIndex(def.baseDamage, rank);
   return def.baseDamage[idx] + def.adRatio * bonusAd + def.apRatio * ap;
 }
 
@@ -298,7 +337,7 @@ function abilityMaxHpDamage(abilityKey, rank, targetMaxHp) {
   const def = ABILITIES[abilityKey];
   if (!def) throw new Error("unknown ability: " + abilityKey);
   if (!def.maxHpRatio) return 0;
-  const idx = Math.min(rank, def.maxHpRatio.length) - 1;
+  const idx = abilityRankIndex(def.maxHpRatio, rank);
   return def.maxHpRatio[idx] * targetMaxHp;
 }
 
@@ -437,6 +476,13 @@ function selectTowerTarget(tower, candidates, now) {
 
 // Reap is the camp execute available to every champion. It deals flat true
 // damage to a camp monster, scaling with champion level.
+
+// Reap tuning shared with the game layer.
+const REAP = Object.freeze({
+  cooldown: 15, // seconds
+  range: 320, // how close the nearest camp monster must be
+});
+
 function reapDamage(championLevel) {
   return 450 + (championLevel - 1) * 40;
 }
@@ -456,6 +502,7 @@ const Sim = {
   CAMP_STATS,
   LAST_HIT_GOLD,
   SHARED_GOLD,
+  STARTING_GOLD,
   AMBIENT_GOLD_START,
   AMBIENT_GOLD_TICK,
   AMBIENT_GOLD_AMOUNT,
@@ -465,6 +512,8 @@ const Sim = {
   cumulativeXpForLevel,
   levelFromXp,
   splitXp,
+  LEVEL_GROWTH,
+  respawnTime,
   CAMP_RESPAWN,
   createCamp,
   clearCamp,
@@ -486,6 +535,7 @@ const Sim = {
   TOWER_AGGRO_WINDOW,
   towerShotDamage,
   selectTowerTarget,
+  REAP,
   reapDamage,
   reapExecutes,
 };

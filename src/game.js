@@ -94,7 +94,7 @@
     attackPeriod: heroStats.attackPeriod,
     xp: 0,
     level: 1,
-    gold: 475,
+    gold: Sim.STARTING_GOLD,
     kills: 0,
     deaths: 0,
     dead: false,
@@ -117,7 +117,7 @@
   };
 
   function heroAttackDamage() {
-    return hero.baseAd + hero.bonusAd + (hero.level - 1) * 4;
+    return hero.baseAd + hero.bonusAd + (hero.level - 1) * Sim.LEVEL_GROWTH.attackDamage;
   }
 
   // Camps pair Sim camp state with live monster units.
@@ -144,6 +144,8 @@
         radius: stats.monsterRadius,
         maxHp: stats.monsterHp,
         hp: stats.monsterHp,
+        armor: stats.armor,
+        magicResist: stats.magicResist,
         damage: stats.monsterDamage,
         attackCooldown: 0,
         rootUntil: 0,
@@ -255,9 +257,9 @@
     hero.xp += amount;
     hero.level = Sim.levelFromXp(hero.xp);
     if (hero.level > before) {
-      hero.maxHp += 95 * (hero.level - before);
-      hero.maxMana += 35 * (hero.level - before);
-      hero.hp = Math.min(hero.maxHp, hero.hp + 120);
+      hero.maxHp += Sim.LEVEL_GROWTH.maxHp * (hero.level - before);
+      hero.maxMana += Sim.LEVEL_GROWTH.maxMana * (hero.level - before);
+      hero.hp = Math.min(hero.maxHp, hero.hp + Sim.LEVEL_GROWTH.levelUpHeal);
       hero.mana = hero.maxMana;
     }
   }
@@ -349,7 +351,10 @@
       if (found.unit && found.distance <= m.range + found.unit.radius) {
         if (m.attackCooldown <= 0) {
           m.attackCooldown = 1.1;
-          damageUnit(found.unit, m.damage, m);
+          // Minion damage follows the same mitigation curve as every
+          // other damage source (design.md, Combat). Targets without a
+          // recorded armor stat (bloblets) take it unmitigated.
+          damageUnit(found.unit, Sim.mitigatePhysical(m.damage, found.unit.armor), m);
         }
         return;
       }
@@ -490,6 +495,7 @@
       return;
     }
     const def = Sim.ABILITIES[key];
+    if (def.unlockLevel && hero.level < def.unlockLevel) return;
     if (hero.cooldowns[key] > 0 || hero.mana < def.manaCost) return;
     hero.mana -= def.manaCost;
     hero.cooldowns[key] = def.cooldown;
@@ -553,6 +559,10 @@
     hero.chargeStart = null;
     if (hero.dead || hero.split || hero.flight) return;
     const def = Sim.ABILITIES.elasticLaunch;
+    // The mana cost is only committed on release, and other casts
+    // during the charge may have spent it. If it is no longer there,
+    // the launch fizzles instead of driving mana negative.
+    if (hero.mana < def.manaCost) return;
     hero.mana -= def.manaCost;
     hero.cooldowns.elasticLaunch = def.cooldown;
     const range = Sim.launchRange(chargeSeconds);
@@ -644,13 +654,24 @@
   function killHero() {
     hero.dead = true;
     hero.deaths += 1;
+    state.moveTarget = null; // no walking back to a pre-death click
     hero.split = false;
     hero.bloblets = [];
     hero.grab = null;
     hero.chargeStart = null;
     hero.bounce = null;
     hero.flight = null;
-    hero.respawnAt = state.time + 5 + hero.level * 0.5;
+    hero.respawnAt = state.time + Sim.respawnTime(hero.level);
+  }
+
+  // Death resolution, shared by the grounded and flight paths: Loose
+  // Gel gets one say before death does.
+  function resolveDeath() {
+    if (state.time >= hero.passiveReadyAt) {
+      enterSplit();
+    } else {
+      killHero();
+    }
   }
 
   function castReap() {
@@ -667,8 +688,8 @@
         }
       });
     });
-    if (!best || bestD > 320) return;
-    hero.cooldowns.reap = 15;
+    if (!best || bestD > Sim.REAP.range) return;
+    hero.cooldowns.reap = Sim.REAP.cooldown;
     if (Sim.reapExecutes(best.hp, hero.level)) {
       best.hp = 0;
       best.lastAttacker = hero;
@@ -685,11 +706,6 @@
     state.camps.forEach(function (camp) {
       camp.monsters.forEach(function (mon) {
         if (mon.hp > 0 && dist(point, mon) <= radius + mon.radius) {
-          // Give monsters the defense stats abilityDamage expects.
-          if (mon.armor === undefined) {
-            mon.armor = 12;
-            mon.magicResist = 12;
-          }
           out.push(mon);
         }
       });
@@ -698,6 +714,18 @@
   }
 
   function updateHero(dt) {
+    // Personal timers run on the game clock in every state: ability
+    // cooldowns keep ticking and gel chunks keep expiring while Bloop
+    // is dead, split, or flying, just like the world timers (waves,
+    // camps, towers) already do.
+    Object.keys(hero.cooldowns).forEach(function (k) {
+      hero.cooldowns[k] = Math.max(0, hero.cooldowns[k] - dt);
+    });
+    hero.attackCooldown -= dt;
+    state.chunks = state.chunks.filter(function (c) {
+      return state.time < c.expiresAt;
+    });
+
     if (hero.dead) {
       if (state.time >= hero.respawnAt) {
         hero.dead = false;
@@ -741,7 +769,7 @@
     }
 
     // Loose Gel chunks: taking damage sheds a chunk now and then;
-    // walking over one heals. Chunks expire.
+    // walking over one heals. Expiry runs on the game clock above.
     if (hero.hp < hero.lastHp && hero.hp > 0 && state.time >= hero.chunkCd) {
       hero.chunkCd = state.time + Sim.PASSIVE.chunkDropCooldown;
       state.chunks.push({
@@ -751,7 +779,6 @@
       });
     }
     state.chunks = state.chunks.filter(function (c) {
-      if (state.time >= c.expiresAt) return false;
       if (dist(hero, c) <= hero.radius + 14) {
         hero.hp = Math.min(hero.maxHp, hero.hp + Sim.chunkHealAmount(hero.maxHp));
         return false;
@@ -770,6 +797,13 @@
 
     // Elastic Launch flight.
     if (hero.flight) {
+      // Lethal damage taken mid-flight ends the flight here: no
+      // landing damage, no knockup, no auto-attack from a dead blob.
+      if (hero.hp <= 0) {
+        hero.flight = null;
+        resolveDeath();
+        return;
+      }
       const f = hero.flight;
       const t = Math.min(1, (state.time - f.start) / f.duration);
       hero.x = f.fromX + (f.toX - f.fromX) * t;
@@ -789,12 +823,6 @@
     if (state.time >= Sim.AMBIENT_GOLD_START) {
       hero.gold += (Sim.AMBIENT_GOLD_AMOUNT / Sim.AMBIENT_GOLD_TICK) * dt;
     }
-
-    // Cooldowns.
-    Object.keys(hero.cooldowns).forEach(function (k) {
-      hero.cooldowns[k] = Math.max(0, hero.cooldowns[k] - dt);
-    });
-    hero.attackCooldown -= dt;
 
     // Boing Barrage bounces tick on their own timer.
     if (hero.bounce && state.time >= hero.bounce.nextAt) doBounce();
@@ -857,14 +885,7 @@
       damageUnit(target, Sim.mitigatePhysical(heroAttackDamage(), armor), hero);
     }
 
-    if (hero.hp <= 0) {
-      // Loose Gel gets one say before death does.
-      if (state.time >= hero.passiveReadyAt) {
-        enterSplit();
-      } else {
-        killHero();
-      }
-    }
+    if (hero.hp <= 0) resolveDeath();
   }
 
   function updateProjectiles(dt) {

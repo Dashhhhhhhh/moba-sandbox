@@ -41,6 +41,16 @@ test("updateCamp revives a camp once and reports it", function () {
   assert.equal(Sim.updateCamp(camp, 200), false);
 });
 
+test("clearing an already cleared camp does not extend its respawn timer", function () {
+  const camp = Sim.createCamp("small");
+  Sim.clearCamp(camp, 0);
+  Sim.clearCamp(camp, 100);
+  assert.equal(camp.clearedAt, 0);
+  assert.equal(camp.respawnAt, 150);
+  assert.equal(Sim.isCampAlive(camp, 149), false);
+  assert.equal(Sim.isCampAlive(camp, 150), true);
+});
+
 test("a camp can be cleared again after respawning", function () {
   const camp = Sim.createCamp("buff");
   Sim.clearCamp(camp, 0);

@@ -50,6 +50,10 @@ test("elastic launch range grows with charge time and clamps", function () {
   assert.equal(Sim.launchRange(99), def.maxRange);
 });
 
+test("boing barrage unlocks at level 6", function () {
+  assert.equal(Sim.ABILITIES.boingBarrage.unlockLevel, 6);
+});
+
 test("boing barrage bounces exactly four times", function () {
   assert.equal(Sim.ABILITIES.boingBarrage.bounces, 4);
   // Per-bounce rank 1 damage vs 0 resist is the 120 base; four bounces
@@ -84,6 +88,21 @@ test("revive health scales with surviving bloblets", function () {
   assert.ok(Math.abs(Sim.blobletReviveHp(1000, 1) - 150) < 0.001);
   assert.ok(Math.abs(Sim.blobletReviveHp(1000, 4) - 300) < 0.001);
   assert.equal(Sim.blobletReviveHp(1000, 0), 0);
+});
+
+test("invalid ability ranks throw instead of returning NaN", function () {
+  const target = { armor: 0, magicResist: 0, maxHp: 1000 };
+  [0, -1, NaN].forEach(function (rank) {
+    assert.throws(function () {
+      Sim.abilityRawDamage("oozeBurst", rank, 0, 0);
+    }, /invalid ability rank/);
+    assert.throws(function () {
+      Sim.abilityMaxHpDamage("oozeBurst", rank, 1000);
+    }, /invalid ability rank/);
+    assert.throws(function () {
+      Sim.abilityDamage("oozeBurst", rank, 0, 0, target);
+    }, /invalid ability rank/);
+  });
 });
 
 test("unknown ability throws", function () {
