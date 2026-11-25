@@ -97,6 +97,7 @@
     gold: 475,
     kills: 0,
     deaths: 0,
+    campClears: 0,
     dead: false,
     respawnAt: 0,
     rootUntil: 0,
@@ -436,6 +437,7 @@
         Sim.clearCamp(camp.sim, state.time);
         hero.gold += camp.def.stats.gold;
         gainXp(camp.def.stats.xp);
+        hero.campClears += 1;
       }
     });
   }
@@ -1224,6 +1226,13 @@
     mana: document.getElementById("hud-mana"),
     xp: document.getElementById("hud-xp"),
     abilities: document.getElementById("hud-abilities"),
+    scoreboardToggle: document.getElementById("scoreboard-toggle"),
+    scoreboard: document.getElementById("match-scoreboard"),
+    scoreboardKills: document.getElementById("score-blue-kills"),
+    scoreboardDeaths: document.getElementById("score-blue-deaths"),
+    scoreboardGold: document.getElementById("score-blue-gold"),
+    scoreboardXp: document.getElementById("score-blue-xp"),
+    scoreboardCamps: document.getElementById("score-blue-camps"),
   };
 
   function fmtTime(t) {
@@ -1267,6 +1276,17 @@
       cdText("boingBarrage", "R Boing Barrage") + "   |   " +
       "F Reap " + (hero.cooldowns.reap > 0 ? hero.cooldowns.reap.toFixed(1) : "ready") + "   |   " +
       passiveLabel;
+    hud.scoreboardKills.textContent = String(hero.kills);
+    hud.scoreboardDeaths.textContent = String(hero.deaths);
+    hud.scoreboardGold.textContent = String(Math.floor(hero.gold));
+    hud.scoreboardXp.textContent = String(Math.floor(hero.xp));
+    hud.scoreboardCamps.textContent = String(hero.campClears);
+  }
+
+  function toggleScoreboard() {
+    const isOpen = hud.scoreboard.hidden;
+    hud.scoreboard.hidden = !isOpen;
+    hud.scoreboardToggle.setAttribute("aria-expanded", String(isOpen));
   }
 
   // ------------------------------------------------------------ input
@@ -1289,6 +1309,10 @@
   window.addEventListener("keydown", function (evt) {
     const k = evt.key.toLowerCase();
     state.keys[k] = true;
+    if (k === "tab") {
+      evt.preventDefault();
+      if (!evt.repeat) toggleScoreboard();
+    }
     if (k === "q") castAbility("stretchGrab");
     if (k === "w") castAbility("oozeBurst");
     if (k === "e" && !evt.repeat) startCharge(); // hold to charge Elastic Launch
@@ -1296,6 +1320,7 @@
     if (k === "f") castReap();
     if (["arrowup", "arrowdown", "arrowleft", "arrowright", " "].indexOf(k) >= 0) evt.preventDefault();
   });
+  hud.scoreboardToggle.addEventListener("click", toggleScoreboard);
   window.addEventListener("keyup", function (evt) {
     const k = evt.key.toLowerCase();
     state.keys[k] = false;

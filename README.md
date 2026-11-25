@@ -32,13 +32,13 @@ What works today:
 - Six lane towers with targeting priority: a champion who attacks an allied
   champion under a tower draws its fire, then minions, then champions
 - Gold, XP, and levels, with ability ranks that grow as you level
+- A match scoreboard for champion kills, deaths, gold, XP, and camp clears
 - One playable champion, **Bloop, the Bounceback Blob** (below)
 - Death and respawn, plus Bloop's bloblet revive
 
 Not built yet, all on the work board: items and a shop, enemy champion
 bots, epic boss encounters in the river pits (Gorehorn and Vessikar),
-Heartspires and the win condition, the Ember Sigil buff, a minimap, and a
-scoreboard.
+Heartspires and the win condition, the Ember Sigil buff, and a minimap.
 
 ### Bloop, the Bounceback Blob
 
@@ -73,6 +73,7 @@ Every mechanic and number is specified in the design contract,
 | E | Elastic Launch (hold to charge, release to fly) |
 | R | Boing Barrage |
 | F | Reap, the camp execute |
+| Tab | Toggle the match scoreboard |
 
 Your champion auto-attacks the nearest enemy in range.
 
