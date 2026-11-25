@@ -60,14 +60,29 @@ is original to this project.
 
 - Respawn after a full clear: small camps 150 s, buff camps 300 s, epic
   objectives 360 s. The timer starts when the last monster of the camp dies.
-- Camp rewards (gold and XP to the clearing champion): small camps 65 to 75
-  gold and 90 to 100 XP by camp, buff camps 90 gold and 120 XP.
+- Camp combat and reward values live in `Sim.CAMP_STATS`; map positions
+  remain in `src/game.js`.
+
+| Camp | Monsters | HP each | Damage | Radius | Gold | XP |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Crimson Brute | 1 | 950 | 22 | 24 | 90 | 120 |
+| Ember Wolves | 2 | 520 | 11 | 17 | 70 | 95 |
+| Stone Golems | 2 | 640 | 13 | 17 | 75 | 100 |
+| Thornbacks | 2 | 480 | 12 | 17 | 65 | 90 |
 
 ### Combat
 
 - Physical mitigation: damage * 100 / (100 + armor) for positive armor;
   negative armor amplifies with the mirrored curve. Magic uses the same
   curve against magic resist.
+- Minion combat stats live in `Sim.MINION_STATS`.
+
+| Minion | HP | Damage | Range | Radius | Speed |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Melee | 480 | 11 | 105 | 13 | 105 |
+| Caster | 290 | 16 | 280 | 12 | 105 |
+| Siege | 850 | 22 | 120 | 17 | 95 |
+
 - Minion waves: every 30 s from both bases on all three lanes. Each lane's
   wave is 3 melee + 3 caster minions, plus a siege minion every third wave.
 
@@ -95,9 +110,16 @@ is original to this project.
 
 ### Launch champion: Bloop, the Bounceback Blob
 
+Champion definitions and base stats live in `src/sim.js`; browser gameplay
+and headless tools read from that shared catalog. The
+[CommunityDragon documentation](https://communitydragon.org/docs) is a
+structural reference for organizing game data only. Shatterlane does not
+import League of Legends stats, names, or assets.
+
 An original green slime champion: a bouncy tank who engages by
 slingshotting himself into fights. Base stats in the prototype: 680 HP,
-300 mana, 62 attack damage, 32 armor, 32 magic resist, 150 attack range.
+300 mana, 62 attack damage, 32 armor, 32 magic resist, 335 move speed,
+150 attack range, and a 0.9-second attack period.
 
 - Passive, Loose Gel: when Bloop takes damage, a chunk of gel drops off
   (at most one every 4 s, chunks last 25 s). Walking over a chunk heals
